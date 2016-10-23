@@ -6,6 +6,6 @@ A fun project to not only further my understanding of Java, but also teach mysel
 
 The below list is very premature, and will undoubtedly grow to become more verbose in the future.
 
-- [] `.class` file parser
-- [] Implement and execute ByteCode instructions
-- [] Implement a basic heap with minimal garbage collection
+- [ ] `.class` file parser
+- [ ] Implement and execute ByteCode instructions
+- [ ] Implement a basic heap with minimal garbage collection
