@@ -42,7 +42,15 @@ module DataTypes.Attributes where
     exception_table :: [Exception_Table],
     attribute_count :: Word16,
     attributes :: [Attribute_Info]
-  } deriving (Show)
+  } | StackMapTable_Attribute {
+  } | Exceptions_Attribute {
+  } | BootstrapMethods_Attribute {
+  } | InnerClasses_Attribute {
+  } | EnclosingMethod_Attribute | Synthetic_Attribute | Signature_Attribute |
+    RuntimeVisibleAnnotations_Attribute | RuntimeInvisibleAnnotations_Attribute |
+    RuntimeVisibleParameterAnnotations_Attribute | RuntimeInvisibleParameterAnnotations_Attribute |
+    RuntimeVisibleTypeAnnotations_Attribute | RuntimeInvisibleTypeAnnotations_Attribute |
+    AnnotationDefault_Attribute | MethodParameters_Attribute deriving (Show)
 
   parseAttribute :: [CP_Info] -> Parser Attribute_Info
   parseAttribute cp = do
