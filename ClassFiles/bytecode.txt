@@ -1,0 +1,187 @@
+Classfile /C:/github/CourseWork/OrgProgLang/FinalProject/Ideone.class
+  Last modified Oct 24, 2016; size 1045 bytes
+  MD5 checksum 1b40231003729b280dca1f31814cf96f
+  Compiled from "test.java"
+class Ideone
+  minor version: 0
+  major version: 52
+  flags: ACC_SUPER
+Constant pool:
+   #1 = Methodref          #19.#32        // java/lang/Object."<init>":()V
+   #2 = Fieldref           #33.#34        // java/lang/System.out:Ljava/io/PrintStream;
+   #3 = Methodref          #35.#36        // java/io/PrintStream.println:(Ljava/lang/Object;)V
+   #4 = Class              #37            // java/lang/StringBuilder
+   #5 = Methodref          #4.#32         // java/lang/StringBuilder."<init>":()V
+   #6 = String             #38            // x:
+   #7 = Methodref          #4.#39         // java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+   #8 = Methodref          #4.#40         // java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+   #9 = String             #41            // , i:
+  #10 = Methodref          #4.#42         // java/lang/StringBuilder.toString:()Ljava/lang/String;
+  #11 = Methodref          #35.#43        // java/io/PrintStream.println:(Ljava/lang/String;)V
+  #12 = Class              #44            // java/lang/Exception
+  #13 = String             #45            //
+  #14 = Methodref          #12.#46        // java/lang/Exception."<init>":(Ljava/lang/String;)V
+  #15 = Class              #47            // Ideone
+  #16 = Methodref          #15.#32        // Ideone."<init>":()V
+  #17 = Methodref          #48.#49        // java/lang/Integer.valueOf:(I)Ljava/lang/Integer;
+  #18 = Methodref          #15.#50        // Ideone.doSomethingWith:(Ljava/lang/Integer;)V
+  #19 = Class              #51            // java/lang/Object
+  #20 = Utf8               <init>
+  #21 = Utf8               ()V
+  #22 = Utf8               Code
+  #23 = Utf8               LineNumberTable
+  #24 = Utf8               doSomethingWith
+  #25 = Utf8               (Ljava/lang/Integer;)V
+  #26 = Utf8               main
+  #27 = Utf8               ([Ljava/lang/String;)V
+  #28 = Utf8               StackMapTable
+  #29 = Class              #44            // java/lang/Exception
+  #30 = Utf8               SourceFile
+  #31 = Utf8               test.java
+  #32 = NameAndType        #20:#21        // "<init>":()V
+  #33 = Class              #52            // java/lang/System
+  #34 = NameAndType        #53:#54        // out:Ljava/io/PrintStream;
+  #35 = Class              #55            // java/io/PrintStream
+  #36 = NameAndType        #56:#57        // println:(Ljava/lang/Object;)V
+  #37 = Utf8               java/lang/StringBuilder
+  #38 = Utf8               x:
+  #39 = NameAndType        #58:#59        // append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+  #40 = NameAndType        #58:#60        // append:(I)Ljava/lang/StringBuilder;
+  #41 = Utf8               , i:
+  #42 = NameAndType        #61:#62        // toString:()Ljava/lang/String;
+  #43 = NameAndType        #56:#63        // println:(Ljava/lang/String;)V
+  #44 = Utf8               java/lang/Exception
+  #45 = Utf8
+  #46 = NameAndType        #20:#63        // "<init>":(Ljava/lang/String;)V
+  #47 = Utf8               Ideone
+  #48 = Class              #64            // java/lang/Integer
+  #49 = NameAndType        #65:#66        // valueOf:(I)Ljava/lang/Integer;
+  #50 = NameAndType        #24:#25        // doSomethingWith:(Ljava/lang/Integer;)V
+  #51 = Utf8               java/lang/Object
+  #52 = Utf8               java/lang/System
+  #53 = Utf8               out
+  #54 = Utf8               Ljava/io/PrintStream;
+  #55 = Utf8               java/io/PrintStream
+  #56 = Utf8               println
+  #57 = Utf8               (Ljava/lang/Object;)V
+  #58 = Utf8               append
+  #59 = Utf8               (Ljava/lang/String;)Ljava/lang/StringBuilder;
+  #60 = Utf8               (I)Ljava/lang/StringBuilder;
+  #61 = Utf8               toString
+  #62 = Utf8               ()Ljava/lang/String;
+  #63 = Utf8               (Ljava/lang/String;)V
+  #64 = Utf8               java/lang/Integer
+  #65 = Utf8               valueOf
+  #66 = Utf8               (I)Ljava/lang/Integer;
+{
+  Ideone();
+    descriptor: ()V
+    flags:
+    Code:
+      stack=1, locals=1, args_size=1
+         0: aload_0
+         1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+         4: return
+      LineNumberTable:
+        line 8: 0
+
+  public void doSomethingWith(java.lang.Integer);
+    descriptor: (Ljava/lang/Integer;)V
+    flags: ACC_PUBLIC
+    Code:
+      stack=2, locals=2, args_size=2
+         0: getstatic     #2                  // Field java/lang/System.out:Ljava/io/PrintStream;
+         3: aload_1
+         4: invokevirtual #3                  // Method java/io/PrintStream.println:(Ljava/lang/Object;)V
+         7: return
+      LineNumberTable:
+        line 11: 0
+        line 12: 7
+
+  public static void main(java.lang.String[]);
+    descriptor: ([Ljava/lang/String;)V
+    flags: ACC_PUBLIC, ACC_STATIC
+    Code:
+      stack=4, locals=3, args_size=1
+         0: iconst_1
+         1: istore_1
+         2: iconst_0
+         3: istore_2
+         4: iload_2
+         5: bipush        100
+         7: if_icmpge     91
+        10: iinc          1, 1
+        13: iload_1
+        14: iload_2
+        15: iadd
+        16: istore_1
+        17: getstatic     #2                  // Field java/lang/System.out:Ljava/io/PrintStream;
+        20: new           #4                  // class java/lang/StringBuilder
+        23: dup
+        24: invokespecial #5                  // Method java/lang/StringBuilder."<init>":()V
+        27: ldc           #6                  // String x:
+        29: invokevirtual #7                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+        32: iload_1
+        33: invokevirtual #8                  // Method java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+        36: ldc           #9                  // String , i:
+        38: invokevirtual #7                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+        41: iload_2
+        42: invokevirtual #8                  // Method java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+        45: invokevirtual #10                 // Method java/lang/StringBuilder.toString:()Ljava/lang/String;
+        48: invokevirtual #11                 // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+        51: iload_1
+        52: bipush        56
+        54: irem
+        55: ifne          85
+        58: new           #12                 // class java/lang/Exception
+        61: dup
+        62: new           #4                  // class java/lang/StringBuilder
+        65: dup
+        66: invokespecial #5                  // Method java/lang/StringBuilder."<init>":()V
+        69: ldc           #13                 // String
+        71: invokevirtual #7                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+        74: iload_1
+        75: invokevirtual #8                  // Method java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+        78: invokevirtual #10                 // Method java/lang/StringBuilder.toString:()Ljava/lang/String;
+        81: invokespecial #14                 // Method java/lang/Exception."<init>":(Ljava/lang/String;)V
+        84: athrow
+        85: iinc          2, 1
+        88: goto          4
+        91: goto          109
+        94: astore_2
+        95: new           #15                 // class Ideone
+        98: dup
+        99: invokespecial #16                 // Method "<init>":()V
+       102: iload_1
+       103: invokestatic  #17                 // Method java/lang/Integer.valueOf:(I)Ljava/lang/Integer;
+       106: invokevirtual #18                 // Method doSomethingWith:(Ljava/lang/Integer;)V
+       109: return
+      Exception table:
+         from    to  target type
+             2    91    94   Class java/lang/Exception
+      LineNumberTable:
+        line 15: 0
+        line 17: 2
+        line 18: 10
+        line 19: 13
+        line 20: 17
+        line 21: 51
+        line 22: 58
+        line 17: 85
+        line 27: 91
+        line 25: 94
+        line 26: 95
+        line 28: 109
+      StackMapTable: number_of_entries = 5
+        frame_type = 253 /* append */
+          offset_delta = 4
+          locals = [ int, int ]
+        frame_type = 251 /* same_frame_extended */
+          offset_delta = 80
+        frame_type = 250 /* chop */
+          offset_delta = 5
+        frame_type = 66 /* same_locals_1_stack_item */
+          stack = [ class java/lang/Exception ]
+        frame_type = 14 /* same */
+}
+SourceFile: "test.java"

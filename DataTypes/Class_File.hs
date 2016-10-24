@@ -53,7 +53,7 @@ module DataTypes.Class_File where
 
   main :: IO ()
   main = do
-    r0 <- BS.readFile "ClassFiles/java/util/Arrays.class"
+    r0 <- BS.readFile "ClassFiles/test.class"
     Prelude.putStrLn $ "Starting Bytes: " ++ show (BS.length r0)
     let classFile = parseClassFile r0
     Prelude.putStrLn $ show classFile
