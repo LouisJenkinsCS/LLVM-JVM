@@ -4,6 +4,7 @@ module DataTypes.Methods where
   import Data.Word
   import Control.Monad.State
   import Data.Bits ((.&.))
+  import DataTypes.Constant_Pool
 
   showAccFlags :: Word16 -> String
   showAccFlags n = let
@@ -41,11 +42,11 @@ module DataTypes.Methods where
 
 
 
-  parseMethod :: Parser Method_Info
-  parseMethod = do
+  parseMethod :: [CP_Info] -> Parser Method_Info
+  parseMethod cp = do
     aflags <- getNextShort
     nindex <- getNextShort
     dindex <- getNextShort
     acount <- getNextShort
-    attrs <- replicateM (fromEnum acount) parseAttribute
+    attrs <- replicateM (fromEnum acount) (parseAttribute cp)
     return $ Method aflags nindex dindex acount attrs

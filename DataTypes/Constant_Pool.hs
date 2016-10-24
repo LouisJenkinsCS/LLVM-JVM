@@ -1,11 +1,12 @@
 module DataTypes.Constant_Pool where
   import Data.Word
   import Data.ByteString
+  import Data.ByteString.Char8 (unpack)
   import DataTypes.Parse_Bytes
 
   newtype UTF8_Bytes = UTF8_Bytes [Word8]
   instance Show UTF8_Bytes where
-    show (UTF8_Bytes b) = show $ pack b
+    show (UTF8_Bytes b) = Data.ByteString.Char8.unpack $ pack b
 
   newtype CP_Tag = CP_Tag Word8
   instance Show CP_Tag where
@@ -65,6 +66,8 @@ module DataTypes.Constant_Pool where
     tag :: CP_Tag,
     bootstrap_method_attr_index :: Word16,
     name_and_type_index :: Word16
+  } | Dummy_Info {
+
   }
 
   instance Show CP_Info where
@@ -82,6 +85,7 @@ module DataTypes.Constant_Pool where
     show (MethodHandle_Info t rk ri) = show t ++ "{reference_kind:" ++ show rk ++ ",reference_index:" ++ show ri ++ "}\n"
     show (MethodType_Info t d) = show t ++ "{descriptor_index:" ++ show d ++ "}\n"
     show (InvokeDynamic_Info t bm n) = show t ++ "{bootstrap_method_attr_index:" ++ show bm ++ ",name_and_type_index:" ++ show n ++"}\n"
+    show Dummy_Info = "\n"
 
   parseConstant :: Parser CP_Info
   parseConstant = do

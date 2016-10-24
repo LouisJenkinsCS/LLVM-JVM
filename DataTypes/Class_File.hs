@@ -44,12 +44,12 @@ module DataTypes.Class_File where
     icount <- getNextShort
     ifaces <- replicateM (fromEnum icount) getNextShort
     fcount <- getNextShort
-    flds <- replicateM (fromEnum fcount) parseField
+    flds <- replicateM (fromEnum fcount) (parseField $ Dummy_Info : cp)
     mcount <- getNextShort
-    mthds <- replicateM (fromEnum mcount) parseMethod
+    mthds <- replicateM (fromEnum mcount) (parseMethod $ Dummy_Info : cp)
     acount <- getNextShort
-    attrs <- replicateM (fromEnum acount) parseAttribute
-    return $ ClassFile m minVer maxVer cp_count cp aflags tclass sclass icount ifaces fcount flds mcount mthds acount attrs
+    attrs <- replicateM (fromEnum acount) (parseAttribute $ Dummy_Info : cp)
+    return $ ClassFile m minVer maxVer cp_count (Dummy_Info : cp) aflags tclass sclass icount ifaces fcount flds mcount mthds acount attrs
 
   main :: IO ()
   main = do

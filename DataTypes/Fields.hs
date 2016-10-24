@@ -3,6 +3,7 @@ module DataTypes.Fields where
   import DataTypes.Attributes
   import DataTypes.Parse_Bytes
   import Control.Monad.State
+  import DataTypes.Constant_Pool
 
   {-
     Field Type
@@ -20,11 +21,11 @@ module DataTypes.Fields where
       show aflags ++ ",name_index:" ++ show nindex ++ ",descriptor_index:" ++
       show dindex ++ ",attribute_count:" ++ show acount ++ ",attributes:" ++ show attrs ++ "}\n"
 
-  parseField :: Parser Field_Info
-  parseField = do
+  parseField :: [CP_Info] -> Parser Field_Info
+  parseField cp = do
     aflags <- getNextShort
     nindex <- getNextShort
     dindex <- getNextShort
     acount <- getNextShort
-    attrs <- replicateM (fromEnum acount) parseAttribute
+    attrs <- replicateM (fromEnum acount) (parseAttribute cp)
     return $ Field aflags nindex dindex acount attrs
