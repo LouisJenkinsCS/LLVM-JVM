@@ -21,18 +21,18 @@ module VirtualMachine.Method_Area where
     constant_pool :: Map.Map String ClassFile
   }
 
-  {-
-    Obtain the associated ClassFile with a given class name
-  -}
-  getClassFile :: String -> Method_Area -> ClassFile
-
-  {-
-    Construct a proper stack frame for the requested method of the requested
-    class name.
-  -}
-  invokeMethod :: String -> Word16 -> Method_Area -> Stack_Frame
-
-  {-
-    Obtain the constant value requested.
-  -}
-  obtainedConstantValue :: String -> Word16 -> Method_Area -> Value
+  -- {-
+  --   Obtain the associated ClassFile with a given class name
+  -- -}
+  -- getClassFile :: String -> Method_Area -> ClassFile
+  --
+  -- {-
+  --   Construct a proper stack frame for the requested method of the requested
+  --   class name.
+  -- -}
+  -- invokeMethod :: String -> Word16 -> Method_Area -> Stack_Frame
+  --
+  -- {-
+  --   Obtain the constant value requested.
+  -- -}
+  -- obtainedConstantValue :: String -> Word16 -> Method_Area -> Value
