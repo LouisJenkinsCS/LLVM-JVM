@@ -1,5 +1,6 @@
 module DataTypes.Class_File where
   import Data.Word
+  import qualified Data.List as List
   import Data.ByteString.Char8 as CBS
   import qualified Data.ByteString as BS
   import DataTypes.Constant_Pool
@@ -8,6 +9,8 @@ module DataTypes.Class_File where
   import DataTypes.Attributes
   import DataTypes.Methods
   import DataTypes.Fields
+  import VirtualMachine.Stack
+  import Data.IORef
 
   {-
     Data structure representation of a `.class` file.
@@ -28,7 +31,7 @@ module DataTypes.Class_File where
       methods_count :: Word16,
       methods :: [Method_Info],
       attributes_count :: Word16,
-      attribute :: [Attribute_Info]
+      classfile_attributes :: [Attribute_Info]
   } deriving (Show)
 
   parseClassFile :: ByteString -> ClassFile
@@ -57,3 +60,14 @@ module DataTypes.Class_File where
     Prelude.putStrLn $ "Starting Bytes: " ++ show (BS.length r0)
     let classFile = parseClassFile r0
     Prelude.putStrLn $ show classFile
+    stack <- bootstrap
+    str <- debugStack stack
+    Prelude.putStrLn $ "Pre-Stack: " ++ str
+    pushFrame stack [1]
+    -- let codeAttr = getCodeAttribute (cp_info classFile) (classfile_attributes classFile)
+    -- let code' = code codeAttr
+    str' <- debugStack stack
+    Prelude.putStrLn $ "Post-Stack: " ++ str'
+    debugExec stack
+    str'' <- debugStack stack
+    Prelude.putStrLn $ "Final-Stack" ++ str''

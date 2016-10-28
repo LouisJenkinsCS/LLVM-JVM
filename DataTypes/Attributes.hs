@@ -74,3 +74,14 @@ module DataTypes.Attributes where
       _ -> do
         info <- replicateM (fromEnum len) getNextByte
         return $ Unknown_Attribute nindex len info name
+
+  getCodeAttribute :: [CP_Info] -> [Attribute_Info] -> Attribute_Info
+  getCodeAttribute = findCodeAttribute
+    where
+      findCodeAttribute :: [CP_Info] -> [Attribute_Info] -> Attribute_Info
+      findCodeAttribute cp (x:xs) = let
+        nindex = attribute_name_index x
+        name = show $ utf8_bytes $ cp !! fromEnum nindex
+        in
+          if name == "Code" then x else findCodeAttribute cp xs
+      findCodeAttribute _ [] = undefined

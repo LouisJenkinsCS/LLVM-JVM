@@ -15,7 +15,7 @@
 module VirtualMachine.Method_Area where
   import DataTypes.Class_File
   import qualified Data.Map.Strict as Map
-  import qualified VirtualMachine.Stack_Frame
+  import qualified VirtualMachine.ByteCode
 
   data Method_Area = MArea {
     constant_pool :: Map.Map String ClassFile
