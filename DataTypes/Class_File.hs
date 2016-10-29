@@ -70,4 +70,11 @@ module DataTypes.Class_File where
     Prelude.putStrLn $ "Post-Stack: " ++ str'
     debugExec stack
     str'' <- debugStack stack
-    Prelude.putStrLn $ "Final-Stack" ++ str''
+    Prelude.putStrLn $ "Final-Stack: " ++ str''
+    pushFrame stack [1,1,1,1]
+    debugExec stack
+    debugExec stack
+    debugExec stack
+    debugExec stack
+    str''' <- debugStack stack
+    Prelude.putStrLn $ "Extended-Stack: " ++ str'''
