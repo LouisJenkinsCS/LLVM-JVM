@@ -9,12 +9,12 @@ module VirtualMachine.Types where
   type ByteCode = Word8
   type Instructions = IORef [ByteCode]
 
-  type Local_Variable = Int
-  type Operands = Int
-  type Value = Int
+  type Local_Variable = Word64
+  type Operand = Word32
+  type Value = Word64
 
   data Stack_Frame = Frame {
     locals :: IORef [Local_Variable],
-    opStack :: IORef [Operands],
+    opStack :: IORef [Operand],
     instructions :: Instructions
   }

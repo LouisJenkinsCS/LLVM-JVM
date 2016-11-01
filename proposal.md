@@ -26,9 +26,3 @@ the built-in Haskell functionality. As well, String concatenation of primitive t
 example of accessing constants can be seen at §3.4), as they can be further substituted for built-in types. As well, auto-boxed objects such as `Integer`, `Double`, and `Float` (auto-boxing generally created using the
 `valueOf` static method) can also be substituted. As well, support for invoking methods (creating a new stack frame) as well as basic exception handling (only `java/lang/Exception`), the latter being optional by the time
 of presentation, should simulate the stack.
-
-### Haskell Implementation Details
-
-This will make heavy-use of Haskell's built-in constructs as utilities, and involves comprehensive knowledge of mathematical constructs such as the `Functor` and `Monad`, as well as extensive knowledge of its control
-constructs. Parsing is handled using the `StateT` monad, which handles elegant simple state transitions, and the JVM `Environment` is kept mutable by using the `IORef` monad for mutable state, and also allowing interleaved
-IO. The implementation details, may change by the time of presentation.

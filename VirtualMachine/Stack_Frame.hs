@@ -27,9 +27,15 @@ module VirtualMachine.Stack_Frame where
   putLocal offset val frameRef = do
     frame <- readIORef frameRef
     let l = locals frame
-    old <- readIORef l
-    writeIORef l ((element (fromEnum offset) .~ val) old)
-
+    -- TODO: Change to Data.Array.MArray, so I can avoid this mess
+    modifyIORef l (inject 0 offset val)
+      where
+        inject :: Word16 -> Word16 -> Value -> [Local_Variable] -> [Local_Variable]
+        inject m n val' (x:xs)
+          | n == m =  val' : x : xs
+          | n > m = x : inject (m+1) n val' xs
+          | otherwise = error $ "Bad range: " ++ show m ++ " of " ++ show n
+        inject _ _ val' [] = [val']
   {-
     Returns the value associated the given index.
   -}
@@ -43,26 +49,26 @@ module VirtualMachine.Stack_Frame where
   {-
     Pushes a value on the operand stack
   -}
-  pushOp :: Value -> StackFrame -> IO ()
+  pushOp :: Operand -> StackFrame -> IO ()
   pushOp val frameRef = do
     frame <- readIORef frameRef
     let o = opStack frame
-    modifyIORef' o (\old -> val : old)
+    modifyIORef' o (\old -> fromIntegral val : old)
 
   {-
     Pops the operand off of the stack
   -}
-  popOp :: StackFrame -> IO Value
+  popOp :: StackFrame -> IO Operand
   popOp frameRef = do
     frame <- readIORef frameRef
     let o = opStack frame
     arr <- readIORef o
     let val = head arr
     modifyIORef' o tail
-    return val
+    return $ fromIntegral val
 
   {-
     Pops off N operands off of the stack
   -}
-  popOpN :: Word8 -> StackFrame -> IO [Value]
+  popOpN :: Word8 -> StackFrame -> IO [Operand]
   popOpN n frameRef = replicateM (fromEnum n) (popOp frameRef)
