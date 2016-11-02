@@ -1,5 +1,7 @@
 module VirtualMachine.Stack_Frame where
+  import Control.Applicative
   import Data.Word
+  import Data.Bits
   import Control.Lens
   import Data.IORef
   import Control.Monad
@@ -45,6 +47,23 @@ module VirtualMachine.Stack_Frame where
     let l = locals frame
     arr <- readIORef l
     return $ arr !! fromEnum offset
+
+  {-
+    Obtains the next WORD-sized (4-byte, Word32) local variable from the stack.
+  -}
+  getLocalWORD :: Word16 -> StackFrame -> IO Word32
+  getLocalWORD idx frame = fromIntegral <$> getLocal idx frame
+
+  {-
+    Obtains the next DWORD-sized (8-bytes, Word64) local variable from the stack.
+    As 'locals' is segmented in WORD-sized slots (4-bytes, Word32), in big-endian
+    order (higher byte first), we must obtain index 'n' and 'n+1' and combine
+    them (I.E: In C -> high_word << 32 | low_word).
+  -}
+  getLocalDWORD :: Word16 -> StackFrame -> IO Word64
+  getLocalDWORD idx frame = asDWORD <$> getLocalWORD idx frame <*> getLocalWORD (idx + 1) frame
+      where
+        asDWORD high low = fromIntegral $ high `shift` 32 .|. low
 
   {-
     Pushes a value on the operand stack

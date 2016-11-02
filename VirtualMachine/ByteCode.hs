@@ -57,40 +57,34 @@ module VirtualMachine.ByteCode where
     -- ILOAD || FLOAD || ALOAD
     | bc == 21 || bc == 23 || bc == 25 = do
       idx <- getNextBC instrRef
-      local <- getLocal (fromIntegral idx) frame
+      local <- getLocalWORD (fromIntegral idx) frame
       pushOp (fromIntegral local) frame
     -- LLOAD || DLOAD
     | bc == 22 || bc == 24 = do
       idx <- getNextBC instrRef
-      high <- getLocal (fromIntegral idx) frame
-      low <- getLocal (fromIntegral $ idx + 1) frame
-      let local = high .|. low
+      local <- getLocalDWORD (fromIntegral idx) frame
       pushOp (fromIntegral local) frame
     -- ILOAD_*
     | bc >= 26 && bc <= 29 = do
-      local <- getLocal (fromIntegral $ bc - 26) frame
+      local <- getLocalWORD (fromIntegral $ bc - 26) frame
       pushOp (fromIntegral local) frame
     -- LLOAD_*
     | bc >= 30 && bc <= 33 = do
       let idx = fromIntegral $ bc - 30
-      high <- getLocal idx frame
-      low <- getLocal (idx + 1) frame
-      let local = high .|. low
+      local <- getLocalDWORD idx frame
       pushOp (fromIntegral local) frame
     -- FLOAD_*
     | bc >= 34 && bc <= 37 = do
-      local <- getLocal (fromIntegral $ bc - 34) frame
+      local <- getLocalWORD (fromIntegral $ bc - 34) frame
       pushOp (fromIntegral local) frame
     -- DLOAD_*
     | bc >= 38 && bc <= 41 = do
       let idx = fromIntegral $ bc - 38
-      high <- getLocal idx frame
-      low <- getLocal (idx + 1) frame
-      let local = high .|. low
+      local <- getLocalDWORD idx frame
       pushOp (fromIntegral local) frame
     -- ALOAD_*
     | bc >= 42 && bc <= 45 = do
-      local <- getLocal (fromIntegral $ bc - 42) frame
+      local <- getLocalWORD (fromIntegral $ bc - 42) frame
       pushOp (fromIntegral local) frame
     -- *ALOAD (TODO)
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
@@ -134,11 +128,11 @@ module VirtualMachine.ByteCode where
       let low = operand .&. 0xFFFFFFFF
       putLocal (fromIntegral idx) (fromIntegral high) frame
       putLocal (fromIntegral $ idx + 1) (fromIntegral low) frame
-    -- ALOAD_*
+    -- ASTORE_*
     | bc >= 75 && bc <= 78 = do
       operand <- popOp frame
       putLocal (fromIntegral $ bc - 75) (fromIntegral operand) frame
-    -- *ALOAD (TODO)
+    -- *ASTORE (TODO)
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
   getNextBC :: Instructions -> IO ByteCode
