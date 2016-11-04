@@ -29,15 +29,17 @@ module VirtualMachine.ByteCode where
     | bc >= 96 && bc <= 132 = mathOp frame bc
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
-  execute :: StackFrame -> Instructions -> IO ()
-  execute frame instrRef = do
+  execute :: StackFrame -> IO ()
+  execute frame = do
+    f <- readIORef frame
+    let instrRef = instructions f
     instr <- readIORef instrRef
     case length instr of
       0 -> return ()
       _ -> do
         bc <- getNextBC instrRef
         execute' frame bc instrRef
-        execute frame instrRef
+        execute frame
 
 
   constOp :: StackFrame -> ByteCode -> IO ()
