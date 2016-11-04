@@ -1,6 +1,5 @@
 module DataTypes.Class_File where
   import Data.Word
-  import qualified Data.List as List
   import Data.ByteString.Char8 as CBS
   import qualified Data.ByteString as BS
   import DataTypes.Constant_Pool
@@ -10,7 +9,6 @@ module DataTypes.Class_File where
   import DataTypes.Methods
   import DataTypes.Fields
   import VirtualMachine.Stack
-  import Data.IORef
 
   {-
     Data structure representation of a `.class` file.
@@ -63,7 +61,8 @@ module DataTypes.Class_File where
     stack <- bootstrap
     str <- debugStack stack
     Prelude.putStrLn $ "Pre-Stack: " ++ str
-    pushFrame stack [4,132,132,132,59]
+    pushFrame stack 1 [4,132,132,132,59]
+    Prelude.putStrLn $ "Setup Stack..."
     -- let codeAttr = getCodeAttribute (cp_info classFile) (classfile_attributes classFile)
     -- let code' = code codeAttr
     str' <- debugStack stack

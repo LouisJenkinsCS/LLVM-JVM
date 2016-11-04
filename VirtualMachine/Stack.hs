@@ -1,6 +1,7 @@
 module VirtualMachine.Stack where
   import Data.IORef
   import Control.Monad
+  import Data.Word
   import VirtualMachine.Types
   import VirtualMachine.Stack_Frame
   import VirtualMachine.ByteCode
@@ -16,12 +17,10 @@ module VirtualMachine.Stack where
   popFrame :: Stack -> IO ()
   popFrame framesRef = modifyIORef' framesRef tail
 
-  pushFrame :: Stack -> [ByteCode] -> IO ()
-  pushFrame framesRef instr = do
-    frame <- readIORef framesRef
-    newFrame <- createFrame instr
-    newFrame' <- newIORef newFrame
-    writeIORef framesRef (newFrame' : frame)
+  pushFrame :: Stack -> Word16 -> [ByteCode] -> IO ()
+  pushFrame stack maxLocals instr = readIORef stack
+    >>= \s -> createFrame instr maxLocals >>= newIORef
+    >>= \n -> writeIORef stack (n : s)
 
   debugStack :: Stack -> IO String
   debugStack stack = do
