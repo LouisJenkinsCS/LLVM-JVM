@@ -1,6 +1,7 @@
 module VirtualMachine.ByteCode where
   import Data.IORef
   import Data.Bits
+  import Control.Monad
   import VirtualMachine.Types
   import VirtualMachine.Stack_Frame
 
@@ -24,6 +25,8 @@ module VirtualMachine.ByteCode where
     | bc >= 21 && bc <= 53 = loadOp frame bc instrRef
     -- *STORE*
     | bc >= 54 && bc <= 86 = storeOp frame bc instrRef
+    -- Math Operations
+    | bc >= 96 && bc <= 132 = mathOp frame bc
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
   execute :: StackFrame -> Instructions -> IO ()
@@ -134,6 +137,27 @@ module VirtualMachine.ByteCode where
       putLocal (fromIntegral $ bc - 75) (fromIntegral operand) frame
     -- *ASTORE (TODO)
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
+
+  mathOp :: StackFrame -> ByteCode -> IO ()
+  mathOp frame bc
+    | bc == 96 = apply2IntOp (+)
+    | bc == 100 = apply2IntOp (-)
+    | bc == 104 = apply2IntOp (*)
+    | bc == 108 = apply2IntOp div
+    | bc == 112 = apply2IntOp rem
+    | bc == 116 = applyIntOp negate
+    -- Need to implement as lambda due to shiftL and shiftR requiring type Int
+    | bc == 120 = popOpN 2 frame >>= \(x:y:_) -> pushOp (shiftL x (fromIntegral y)) frame
+    | bc == 122 = popOpN 2 frame >>= \(x:y:_) -> pushOp (shiftR x (fromIntegral y)) frame
+    | bc == 126 = apply2IntOp (.&.)
+    | bc == 128 = apply2IntOp (.|.)
+    | bc == 130 = apply2IntOp xor
+    | bc == 132 = applyIntOp (+1)
+      where
+        applyIntOp :: (Operand -> Operand) -> IO ()
+        applyIntOp f = popWORD frame >>= \x -> pushOp (f x) frame
+        apply2IntOp :: (Operand -> Operand -> Operand) -> IO ()
+        apply2IntOp f = replicateM 2 (popWORD frame) >>= \(x:y:_) -> pushOp (f x y) frame
 
   getNextBC :: Instructions -> IO ByteCode
   getNextBC instrRef = do

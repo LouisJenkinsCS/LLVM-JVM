@@ -87,6 +87,16 @@ module VirtualMachine.Stack_Frame where
     return $ fromIntegral val
 
   {-
+    Helper function to convert to appropriate type
+  -}
+  popWORD :: StackFrame -> IO Word32
+  popWORD frameRef = fromIntegral <$> popOp frameRef
+
+  popDWORD :: StackFrame -> IO Word64
+  popDWORD frameRef = asDWORD <$> replicateM 2 (popOp frameRef)
+    where
+      asDWORD (high:low:_) = fromIntegral $ high `shift` 32 .|. low
+  {-
     Pops off N operands off of the stack
   -}
   popOpN :: Word8 -> StackFrame -> IO [Operand]

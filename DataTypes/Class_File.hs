@@ -63,7 +63,7 @@ module DataTypes.Class_File where
     stack <- bootstrap
     str <- debugStack stack
     Prelude.putStrLn $ "Pre-Stack: " ++ str
-    pushFrame stack [4,59,10,64]
+    pushFrame stack [4,132,132,132,59]
     -- let codeAttr = getCodeAttribute (cp_info classFile) (classfile_attributes classFile)
     -- let code' = code codeAttr
     str' <- debugStack stack
