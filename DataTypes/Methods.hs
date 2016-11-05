@@ -31,22 +31,17 @@ module DataTypes.Methods where
     method_access_flags :: Word16,
     method_name_index :: Word16,
     method_descriptor_index :: Word16,
-    method_attributes_count :: Word16,
     method_attributes :: [Attribute_Info]
   }
 
   instance Show Method_Info where
-    show (Method aflags nindex dindex acount attrs) = "Method: {access_flags:" ++
+    show (Method aflags nindex dindex attrs) = "Method: {access_flags:" ++
       showAccFlags aflags ++ ",name_index:" ++ show nindex ++ ",descriptor_index:" ++
-      show dindex ++ ",attribute_count:" ++ show acount ++ ",attributes:" ++ show attrs ++ "}\n"
+      show dindex ++ ",attribute_count:" ++ show (length attrs) ++ ",attributes:" ++ show attrs ++ "}\n"
 
 
 
-  parseMethod :: [CP_Info] -> Parser Method_Info
-  parseMethod cp = do
-    aflags <- getNextShort
-    nindex <- getNextShort
-    dindex <- getNextShort
-    acount <- getNextShort
-    attrs <- replicateM (fromEnum acount) (parseAttribute cp)
-    return $ Method aflags nindex dindex acount attrs
+  parseMethods :: [CP_Info] -> Parser [Method_Info]
+  parseMethods cp = getNextShort >>= \n -> replicateM (fromIntegral n) parseMethod
+    where
+      parseMethod = Method <$> getNextShort <*> getNextShort <*> getNextShort <*> parseAttributes cp

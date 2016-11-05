@@ -11,13 +11,8 @@ module DataTypes.Attributes where
     catch_type :: Word16
   } deriving (Show)
 
-  parseExceptionTable :: Parser Exception_Table
-  parseExceptionTable = do
-    spc <- getNextShort
-    epc <- getNextShort
-    hpc <- getNextShort
-    ctype <- getNextShort
-    return $ Exception_Table spc epc hpc ctype
+  -- parseExceptionTable :: Parser Exception_Table
+  -- parseExceptionTable = Exception_Table <$> getNextShort <*> getNextShort <*> getNextShort <*> getNextShort
 
   {-
     Attribute Types
@@ -36,11 +31,8 @@ module DataTypes.Attributes where
     attribute_length :: Word32,
     max_stack :: Word16,
     max_locals :: Word16,
-    code_length :: Word32,
     code :: [Word8],
-    exception_table_length :: Word16,
     exception_table :: [Exception_Table],
-    attribute_count :: Word16,
     attributes :: [Attribute_Info]
   } | StackMapTable_Attribute {
   } | Exceptions_Attribute {
@@ -52,28 +44,23 @@ module DataTypes.Attributes where
     RuntimeVisibleTypeAnnotations_Attribute | RuntimeInvisibleTypeAnnotations_Attribute |
     AnnotationDefault_Attribute | MethodParameters_Attribute deriving (Show)
 
-  parseAttribute :: [CP_Info] -> Parser Attribute_Info
-  parseAttribute cp = do
-    nindex <- getNextShort
-    len <- getNextInt
-    let name = show $ utf8_bytes $ cp !! fromEnum nindex
-    case name of
-      "ConstantValue" -> do
-        cvindex <- getNextShort
-        return $ ConstantValue_Attribute nindex len cvindex
-      "Code" -> do
-        stacks <- getNextShort
-        locals <- getNextShort
-        cdeLen <- getNextInt
-        cde <- replicateM (fromEnum cdeLen) getNextByte
-        etLen <- getNextShort
-        etable <- replicateM (fromEnum etLen) parseExceptionTable
-        acount <- getNextShort
-        attrs <- replicateM (fromEnum acount) (parseAttribute cp)
-        return $ Code_Attribute nindex len stacks locals cdeLen cde etLen etable acount attrs
-      _ -> do
-        info <- replicateM (fromEnum len) getNextByte
-        return $ Unknown_Attribute nindex len info name
+  parseAttributes :: [CP_Info] -> Parser [Attribute_Info]
+  parseAttributes cp = getNextShort >>= \n -> replicateM (fromIntegral n) parseAttribute
+    where
+      parseAttribute = do
+        nindex <- getNextShort
+        len <- getNextInt
+        let name = show $ utf8_bytes $ cp !! fromIntegral nindex
+        case name of
+          "ConstantValue" -> ConstantValue_Attribute nindex len <$> getNextShort
+          "Code" -> Code_Attribute nindex len <$> getNextShort <*> getNextShort <*> parseCode
+            <*> parseExceptionTables <*> parseAttributes cp
+              where
+                parseExceptionTables = getNextShort >>= \n -> replicateM (fromIntegral n) parseExceptionTable
+                  where
+                    parseExceptionTable = Exception_Table <$> getNextShort <*> getNextShort <*> getNextShort <*> getNextShort
+                parseCode = getNextInt >>= getNextBytes . fromIntegral
+          _ -> Unknown_Attribute nindex len <$> getNextBytes (fromIntegral len) <*> return name
 
   getCodeAttribute :: [CP_Info] -> [Attribute_Info] -> Attribute_Info
   getCodeAttribute = findCodeAttribute

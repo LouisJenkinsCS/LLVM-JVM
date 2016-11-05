@@ -12,20 +12,15 @@ module DataTypes.Fields where
     field_access_flags :: Word16,
     field_name_index :: Word16,
     field_descriptor_index :: Word16,
-    field_attributes_count :: Word16,
     field_attributes :: [Attribute_Info]
   }
 
   instance Show Field_Info where
-    show (Field aflags nindex dindex acount attrs) = "Field: {access_flags:" ++
+    show (Field aflags nindex dindex attrs) = "Field: {access_flags:" ++
       show aflags ++ ",name_index:" ++ show nindex ++ ",descriptor_index:" ++
-      show dindex ++ ",attribute_count:" ++ show acount ++ ",attributes:" ++ show attrs ++ "}\n"
+      show dindex ++ ",attribute_count:" ++ show (length attrs) ++ ",attributes:" ++ show attrs ++ "}\n"
 
-  parseField :: [CP_Info] -> Parser Field_Info
-  parseField cp = do
-    aflags <- getNextShort
-    nindex <- getNextShort
-    dindex <- getNextShort
-    acount <- getNextShort
-    attrs <- replicateM (fromEnum acount) (parseAttribute cp)
-    return $ Field aflags nindex dindex acount attrs
+  parseFields :: [CP_Info] -> Parser [Field_Info]
+  parseFields cp = getNextShort >>= \n -> replicateM (fromIntegral n) parseField
+    where
+      parseField = Field <$> getNextShort <*> getNextShort <*> getNextShort <*> parseAttributes cp
