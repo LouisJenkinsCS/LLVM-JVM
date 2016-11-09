@@ -11,8 +11,28 @@ module VirtualMachine.Stack_Frame where
     >>= \l -> readIORef (opStack f) >>= \o -> readIORef (instructions f) >>= \i ->
     return $ "Stack_Frame{locals:" ++ show l ++ ",opStack:" ++ show o ++ ",instr:" ++ show i ++ "}"
 
+  {-
+    Creates a stack frame with the request number of Local Variables and the
+    executable bytecode instructions. The number of Local Variables are static and must
+    support random-access, but the Operand Stack is best implemented as a mutable
+    reference.
+  -}
   createFrame :: [ByteCode] -> Word16 -> IO (Stack_Frame Word16)
   createFrame instr maxLocals = Frame <$> newArray (0, maxLocals -1) 0 <*> newIORef [] <*> newIORef instr
+
+  {-
+    Pushes a value on the operand stack
+  -}
+  pushOp :: Operand -> StackFrame -> IO ()
+  pushOp val frame = readIORef frame >>= \f -> modifyIORef (opStack f) (\old -> val : old)
+
+  {-
+    Pops the operand off of the stack
+  -}
+  popOp :: StackFrame -> IO Operand
+  -- IORef can also be modified via 'writeIORef'
+  popOp frame = readIORef frame >>= \f -> readIORef (opStack f)
+    >>= \ops -> writeIORef (opStack f) (tail ops) >> return (head ops)
 
   {-
     Pushes a value as a local variable at the given index.
@@ -42,19 +62,6 @@ module VirtualMachine.Stack_Frame where
   getLocalDWORD idx frame = asDWORD <$> getLocalWORD idx frame <*> getLocalWORD (idx + 1) frame
       where
         asDWORD high low = fromIntegral $ high `shift` 32 .|. low
-
-  {-
-    Pushes a value on the operand stack
-  -}
-  pushOp :: Operand -> StackFrame -> IO ()
-  pushOp val frame = readIORef frame >>= \f -> modifyIORef (opStack f) (\old -> val : old)
-
-  {-
-    Pops the operand off of the stack
-  -}
-  popOp :: StackFrame -> IO Operand
-  popOp frame = readIORef frame >>= \f -> readIORef (opStack f)
-    >>= \ops -> writeIORef (opStack f) (tail ops) >> return (head ops)
 
   {-
     Helper function to convert to appropriate type

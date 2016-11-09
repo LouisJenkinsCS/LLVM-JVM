@@ -19,6 +19,21 @@ module DataTypes.Parse_Bytes (Parser(), bsOfSize, getNextBytes, getNext, getNext
   bsOfSize :: Int -> Parser ByteString
   bsOfSize = state . Data.ByteString.splitAt
 
+  {-
+    Converts the ByteString to big endian (highest-byte first) ordering. The compiler
+    deduces the return type (Word8, Word16, Word32, etc.) based on the context of the caller.
+    By using class constraints, we may bound the potential types of each generic type. In this
+    case, the return type must be an instance of the class 'Bits' (I.E: Word8, Word16, etc.) and
+    be an instance of class 'Num' (I.E: Int), of which the fixed WORD-sized types fulfill.
+
+    "foldl'" is a functor that reduces a list of objects, essentially "folding" them all, into one.
+    An example could be a way to accumulate the sum of a list of all numbers:
+
+    fold (+) [1..10] => 55
+
+    "foldl'" is special in that it will use the identity element (in this case, 0) for the initial value.
+    'ByteString' supplies its own fold, which will apply it to each byte.
+  -}
   toBigEndian :: (Bits a, Num a) => ByteString -> a
   toBigEndian = Data.ByteString.foldl' (\x y -> x `shift` 8 .|. fromIntegral y) 0
 
@@ -41,8 +56,3 @@ module DataTypes.Parse_Bytes (Parser(), bsOfSize, getNextBytes, getNext, getNext
   -- 'first' operator applies the functor, 'f', to the first element in the
   -- tuple, (a, b), such that it becomes (f a, b)
   getNextHex =  fmap encode . bsOfSize
-
-  -- getNext :: (Bits a, Num a) => Int -> ByteString -> (a, ByteString)
-  -- getNext n bstr = let
-  --   (b, bstr') = splitAt n bstr
-  --   in (Data.ByteString.foldl' (\x y -> x `shift` 8 .|. fromIntegral y) 0 b, bstr')

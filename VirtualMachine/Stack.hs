@@ -12,6 +12,10 @@ module VirtualMachine.Stack where
   getCurrentFrame :: Stack -> IO StackFrame
   getCurrentFrame stack = head <$> readIORef stack
 
+  {-
+    Pops the current frame off of the stack. No epilogues, such as garbage collection,
+    have been implemented yet.
+  -}
   popFrame :: Stack -> IO ()
   popFrame stack = modifyIORef' stack tail
 

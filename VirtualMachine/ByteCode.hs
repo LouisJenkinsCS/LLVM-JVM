@@ -27,6 +27,8 @@ module VirtualMachine.ByteCode where
     | bc >= 54 && bc <= 86 = storeOp frame bc instrRef
     -- Math Operations
     | bc >= 96 && bc <= 132 = mathOp frame bc
+    -- RETURN
+    | bc == 177 = return ()
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
   execute :: StackFrame -> IO ()

@@ -9,6 +9,7 @@ module DataTypes.Class_File where
   import DataTypes.Methods
   import DataTypes.Fields
   import VirtualMachine.Stack
+  import DataTypes.Methods
 
   {-
     Data structure representation of a `.class` file.
@@ -65,22 +66,27 @@ module DataTypes.Class_File where
       where
         parseInterfaces = getNextShort >>= \n -> replicateM (fromIntegral n) getNextShort
 
+  getMain :: [CP_Info] -> [Method_Info] -> Method_Info
+  getMain cp (x:xs)
+    | show (utf8_bytes (cp !! fromIntegral (method_name_index x))) == "main" = x
+    | otherwise = getMain cp xs
+  getMain _ [] = error "Main not found"
 
 
 
   main :: IO ()
   main = do
-    r0 <- BS.readFile "ClassFiles/test.class"
+    r0 <- BS.readFile "AdditionTest.class"
     Prelude.putStrLn $ "Starting Bytes: " ++ show (BS.length r0)
     let classFile = parseClassFile r0
     Prelude.putStrLn $ show classFile
     stack <- bootstrap
     str <- debugStack stack
     Prelude.putStrLn $ "Pre-Stack: " ++ str
-    pushFrame stack 1 [4,132,132,132,59]
     Prelude.putStrLn $ "Setup Stack..."
-    -- let codeAttr = getCodeAttribute (cp_info classFile) (classfile_attributes classFile)
-    -- let code' = code codeAttr
+    let m = getMain (cp_info classFile) (methods classFile)
+    let codeAttr = getCodeAttribute (cp_info classFile) (method_attributes m)
+    pushFrame stack (max_locals codeAttr) (code codeAttr)
     str' <- debugStack stack
     Prelude.putStrLn $ "Post-Stack: " ++ str'
     debugExec stack

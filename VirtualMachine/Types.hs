@@ -14,6 +14,10 @@ module VirtualMachine.Types where
   type Operand = Word32
   type Value = Word64
 
+  {-
+    'Frame' is a data constructor, a function of type:
+      (IOArray a -> IORef [Operand] -> Instructions -> Stack_Frame a)
+  -}
   data Stack_Frame a = Frame {
     locals :: IOArray a Local_Variable,
     opStack :: IORef [Operand],
