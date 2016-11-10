@@ -1,14 +1,19 @@
 module VirtualMachine.Environment where
-  import Data.STRef
-  import Control.Monad.ST
-  import VirtualMachine.Method_Area
-  import VirtualMachine.Stack_Frame
+  import Data.IORef
+  import GHC.IOArray
+  import Data.Word
+  import Data.Map
+  import Control.Monad.State
+  import VirtualMachine.Types
+
+  type Runtime_Environment = State Environment
+
+  data Class = Class
 
   data Environment = Env {
-    method_area :: STRef Method_Area,
-    stack_frame :: STRef [Stack_Frame],
-    heap :: STRef Heap,
-    pc :: STRef PC
+    class_map :: IORef (Map String Class),
+    stack_frame :: StackFrame,
+    heap :: IOArray Int Word8
   }
 
  -- {-
