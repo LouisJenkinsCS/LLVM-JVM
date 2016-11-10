@@ -6,9 +6,6 @@ module VirtualMachine.Stack where
   import VirtualMachine.Stack_Frame
   import VirtualMachine.ByteCode
 
-  bootstrap :: IO Stack
-  bootstrap = newIORef []
-
   getCurrentFrame :: Stack -> IO StackFrame
   getCurrentFrame stack = head <$> readIORef stack
 
