@@ -7,8 +7,8 @@ module VirtualMachine.Stack_Frame where
   import Data.Array.MArray
 
   debugFrame :: StackFrame -> IO String
-  debugFrame frame = readIORef frame >>= \f -> getElems (locals f)
-    >>= \l -> readIORef (opStack f) >>= \o -> readIORef (instructions f) >>= \i ->
+  debugFrame frame = readIORef frame >>= \f -> getElems (local_variables f)
+    >>= \l -> readIORef (operand_stack f) >>= \o ->  let i = byte_code . code_segment $ f in
     return $ "Stack_Frame{locals:" ++ show l ++ ",opStack:" ++ show o ++ ",instr:" ++ show i ++ "}"
 
   {-
@@ -17,9 +17,15 @@ module VirtualMachine.Stack_Frame where
     support random-access, but the Operand Stack is best implemented as a mutable
     reference.
   -}
-  createFrame :: [ByteCode] -> Word16 -> IO (Stack_Frame Word16)
-  createFrame instr maxLocals = Frame <$> newArray (0, maxLocals -1) 0 <*> newIORef [] <*> newIORef instr
-
+  pushFrame :: Runtime_Environment -> Method -> IO ()
+  pushFrame env meth = createFrame >>= \f -> modifyIORef' (stack env) ((:) f)
+    where
+      createFrame :: IO StackFrame
+      createFrame = newIORef [] >>= \opStack -> return $ newArray (0, method_locals meth - 1) 0 >>=
+        \locals -> newIORef (Frame locals opStack toCodeSegment)
+        where
+          toCodeSegment :: Code_Segment
+          toCodeSegment = newIORef 0 >>= \pc -> Code (method_code meth) pc
   {-
     Pushes a value on the operand stack
   -}

@@ -4,6 +4,7 @@ module VirtualMachine.ByteCode where
   import Control.Monad
   import VirtualMachine.Types
   import VirtualMachine.Stack_Frame
+  import Data.Binary.IEEE754
 
   execute' :: StackFrame -> ByteCode -> Instructions -> IO ()
   execute' frame bc instrRef

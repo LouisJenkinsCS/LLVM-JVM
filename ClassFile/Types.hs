@@ -25,32 +25,16 @@ module ClassFile.Types where
   } deriving (Show)
 
   -- Attribute Types
-  data Attribute_Info = Unknown_Attribute {
-    attribute_name_index :: Word16,
-    attribute_length :: Word32,
-    attribute_info :: [Word8],
-    attribute_name :: String
-  } | ConstantValue_Attribute {
-    attribute_name_index :: Word16,
-    attribute_length :: Word32,
-    constantvalue_index :: Word16
-  } | Code_Attribute {
-    attribute_name_index :: Word16,
-    attribute_length :: Word32,
-    max_stack :: Word16,
-    max_locals :: Word16,
-    code :: [Word8],
-    exception_table :: [Exception_Table],
-    attributes :: [Attribute_Info]
-  } | StackMapTable_Attribute {
-  } | Exceptions_Attribute {
-  } | BootstrapMethods_Attribute {
-  } | InnerClasses_Attribute {
-  } | EnclosingMethod_Attribute | Synthetic_Attribute | Signature_Attribute |
-    RuntimeVisibleAnnotations_Attribute | RuntimeInvisibleAnnotations_Attribute |
-    RuntimeVisibleParameterAnnotations_Attribute | RuntimeInvisibleParameterAnnotations_Attribute |
-    RuntimeVisibleTypeAnnotations_Attribute | RuntimeInvisibleTypeAnnotations_Attribute |
-    AnnotationDefault_Attribute | MethodParameters_Attribute deriving (Show)
+  data Attribute_Info =
+    Unknown_Attribute { attribute_name_index :: Word16, attribute_length :: Word32, attribute_info :: [Word8], attribute_name :: String }
+    | ConstantValue_Attribute { attribute_name_index :: Word16, attribute_length :: Word32, constantvalue_index :: Word16 }
+    | Code_Attribute { attribute_name_index :: Word16, attribute_length :: Word32, max_stack :: Word16, max_locals :: Word16, code :: [Word8], exception_table :: [Exception_Table], attributes :: [Attribute_Info] }
+    | StackMapTable_Attribute | Exceptions_Attribute | BootstrapMethods_Attribute
+    | InnerClasses_Attribute | EnclosingMethod_Attribute | Synthetic_Attribute | Signature_Attribute
+    | RuntimeVisibleAnnotations_Attribute | RuntimeInvisibleAnnotations_Attribute | RuntimeVisibleParameterAnnotations_Attribute
+    | RuntimeInvisibleParameterAnnotations_Attribute | RuntimeVisibleTypeAnnotations_Attribute | RuntimeInvisibleTypeAnnotations_Attribute
+    | AnnotationDefault_Attribute | MethodParameters_Attribute
+    deriving (Show)
 
 
 

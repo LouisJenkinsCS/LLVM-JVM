@@ -18,8 +18,20 @@ module VirtualMachine.Types where
     program_counter :: IORef Word32
   }
 
+  data Object = IORef [Word8]
+
+  instance Eq Object where
+    (==) (IORef x) (IORef y) = x == y
+
+  instance Ord Object where
+    compare (IORef x) (IORef y) = x `compare` y
+
+  instance Show Object where
+    show (IORef x) = show x
+
   -- LV_Reference gets garbage collected by Haskell's GC.
-  data Value = LV_Null | LV_Integer Int | LV_Long Integer | LV_Float Float | LV_Double Double | LV_Reference (IORef [Word8])
+  data Value = LV_Integer Int | LV_Long Integer| LV_Float Float | LV_Double Double | LV_Reference Object deriving (Eq, Ord, Show)
+
 
   type Local_Variable = Word32
 
@@ -32,7 +44,8 @@ module VirtualMachine.Types where
   type Operand = Value
 
   data Method = Method {
-    method_code :: Instructions
+    method_code :: Instructions,
+    method_locals :: Word16
   }
 
   data Field = Field {
