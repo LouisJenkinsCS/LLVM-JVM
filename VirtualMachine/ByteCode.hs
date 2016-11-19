@@ -60,11 +60,11 @@ module VirtualMachine.ByteCode where
     --
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
-  loadOp :: StackFrame -> ByteCode -> Instructions -> IO ()
-  loadOp frame bc instrRef
+  loadOp :: StackFrame -> Code_Segment -> IO ()
+  loadOp frame
     -- ILOAD || FLOAD || ALOAD
     | bc == 21 || bc == 23 || bc == 25 = do
-      idx <- getNextBC instrRef
+      idx <- getNextBC frame
       local <- getLocalWORD (fromIntegral idx) frame
       pushOp (fromIntegral local) frame
     -- LLOAD || DLOAD
@@ -97,7 +97,7 @@ module VirtualMachine.ByteCode where
     -- *ALOAD (TODO)
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
-  storeOp :: StackFrame -> ByteCode -> Instructions -> IO ()
+  storeOp :: StackFrame -> ByteCode -> Code_Segment -> IO ()
   storeOp frame bc instrRef
     -- ISTORE || FSTORE || ASTORE
     | bc == 54 || bc == 56 || bc == 58 = do
@@ -145,27 +145,30 @@ module VirtualMachine.ByteCode where
 
   mathOp :: StackFrame -> ByteCode -> IO ()
   mathOp frame bc
-    | bc == 96 = apply2IntOp (+)
-    | bc == 100 = apply2IntOp (-)
-    | bc == 104 = apply2IntOp (*)
-    | bc == 108 = apply2IntOp div
-    | bc == 112 = apply2IntOp rem
-    | bc == 116 = applyIntOp negate
+    | bc >= 96 && bc >= 99 = applyBinaryOp (+)
+    | bc >= 100 && bc <= 103 = applyBinaryOp (-)
+    | bc >= 104 && bc <= 107 = applyBinaryOp (*)
+    | bc >= 108 && bc <= 111 = applyBinaryOp div
+    | bc >= 112 && bc <= 115 = applyBinaryOp rem
+    | bc >= 116 && bc <= 119 = applyUnaryOp negate
     -- Need to implement as lambda due to shiftL and shiftR requiring type Int
-    | bc == 120 = popOpN 2 frame >>= \(x:y:_) -> pushOp (shiftL x (fromIntegral y)) frame
-    | bc == 122 = popOpN 2 frame >>= \(x:y:_) -> pushOp (shiftR x (fromIntegral y)) frame
-    | bc == 126 = apply2IntOp (.&.)
-    | bc == 128 = apply2IntOp (.|.)
-    | bc == 130 = apply2IntOp xor
-    | bc == 132 = applyIntOp (+1)
+    | bc == 120 || bc == 121 = applyBinaryOp (\x y -> x `shiftL` fromIntegral y)
+    | bc >= 122 || bc <= 125 = applyBinaryOp (\x y -> x `shiftR` fromIntegral y)
+    | bc == 126 || bc == 127 = applyBinaryOp (.&.)
+    | bc == 128 || bc == 129 = applyBinaryOp (.|.)
+    | bc == 130 || bc == 131 = applyBinaryOp xor
+    | bc == 132 = increment
       where
-        applyIntOp :: (Operand -> Operand) -> IO ()
-        applyIntOp f = popWORD frame >>= \x -> pushOp (f x) frame
-        apply2IntOp :: (Operand -> Operand -> Operand) -> IO ()
-        apply2IntOp f = replicateM 2 (popWORD frame) >>= \(x:y:_) -> pushOp (f x y) frame
+        applyUnaryOp :: (Operand -> Operand) -> IO ()
+        applyUnaryOp f = popOp frame >>= pushOp frame . f
+        applyBinaryOp :: (Operand -> Operand -> Operand) -> IO ()
+        applyBinaryOp f = replicateM 2 (popOp frame) >>= \(x:y:_) -> pushOp frame (f x y)
+        increment :: IO ()
+        increment = getNextBC frame >>= getLocal frame >>= \l -> getNextBC frame >>= \n -> pushOp frame (l + fromIntegral n)
 
-  getNextBC :: Instructions -> IO ByteCode
-  getNextBC instrRef = do
-    instr <- readIORef instrRef
-    modifyIORef instrRef tail
-    return $ head instr
+  getNextBC :: StackFrame -> IO ByteCode
+  getNextBC frame = readIORef frame >>= \f -> -- Read StackFrame from passed reference
+    let segment = code_segment f in -- Retrieve current set of instructions
+    readIORef (program_counter segment) >>= \n -> -- Read current ByteCode instruction
+    modifyIORef (program_counter segment) (+1) >> -- Increment PC
+    return (byte_code segment !! fromIntegral n) -- Return ByteCode instruction

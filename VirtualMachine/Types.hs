@@ -5,10 +5,12 @@ module VirtualMachine.Types where
   import Data.Map
   import Data.Array.IO
   import ClassFile.Types
+  import Control.Monad
+  import Data.STRef
 
   type Stack = IORef [StackFrame]
 
-  type StackFrame = IORef (Stack_Frame Word16)
+  type StackFrame = IORef (Stack_Frame Int)
 
   type ByteCode = Word8
   type Instructions = [ByteCode]
@@ -18,28 +20,14 @@ module VirtualMachine.Types where
     program_counter :: IORef Word32
   }
 
-  data Object = IORef [Word8]
-
-  instance Eq Object where
-    (==) (IORef x) (IORef y) = x == y
-
-  instance Ord Object where
-    compare (IORef x) (IORef y) = x `compare` y
-
-  instance Show Object where
-    show (IORef x) = show x
+  -- Temporary type until a proper heap is setup
+  type Object = Int
 
   -- LV_Reference gets garbage collected by Haskell's GC.
-  data Value = LV_Integer Int | LV_Long Integer| LV_Float Float | LV_Double Double | LV_Reference Object deriving (Eq, Ord, Show)
+  data Value = VInt Int | VLong Integer| VFloat Float | VDouble Double | VReference Object deriving (Eq, Ord, Show)
 
 
-  type Local_Variable = Word32
-
-  wordToInt :: Word32 -> Value
-  wordToInt = LV_Integer . fromIntegral
-
-  wordToLong :: Word32 -> Word32 -> Value
-  wordToLong x y = LV_Long $ fromIntegral (x `shiftL` 32 .|. y)
+  type Local_Variable = Value
 
   type Operand = Value
 
@@ -62,8 +50,22 @@ module VirtualMachine.Types where
 
   data Runtime_Environment = Environment {
     class_map :: IORef (Map String Class),
-    stack :: Stack
+    stack :: Stack,
+    debugMsgs :: [String]
   }
+
+  -- newtype Runtime = Runtime { runRT :: Runtime_Environment -> IO () }
+  --
+  -- execRT :: Runtime -> Runtime_Environment -> IO ()
+  -- execRT = undefined
+  --
+  -- instance Functor Runtime where
+  --   fmap f rt = Runtime $ execRT rt >=> pure . f
+  --
+  -- instance Monad Runtime where
+  --   rt >>= f = Runtime $ \env -> runRT rt env >> f
+
+
 
   data Stack_Frame a = Frame {
     local_variables :: IOArray a Local_Variable,

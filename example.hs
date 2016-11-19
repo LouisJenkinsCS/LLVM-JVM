@@ -1,42 +1,14 @@
-{-
-  Syntax examples...
--}
+-- 's' could be the actual state itself of the Runtime_Environment. I'm using IORef
+-- almost exclusively currently, as everything needs to be mutable. In light of all
+-- of this, I just might switch over to STRef for now, since I'll most likely be want
+-- escaping from the IO monad. What I want to do is have the first parameter (or any order)
+-- being the state, be passed implicitly when these functions are called.
+class Environment s where
+  -- Should take a String, and add it to a queue to be output after the current instruction is processed.
+  debug :: s -> String -> ()
 
--- Function Syntax
+  -- Should delegate processing to it's components, but this data still needs to be accessible anywhere.
+  -- In particular, it will get the constant pool info of the current class at the requested indice.
+  getConstantPool :: s -> Integral a -> CP_Info
 
-{-
-  Functions take parameters using arrows, which may be more familiar in the mathematical
-  form of 'f: x -> y', or 'f(x) = y', wherein a function 'f' takes 'x' as an input, and
-  returns 'y' as an output.
-
-  A mathematical function of the form 'g: x -> y -> z' may look strange, but may make more
-  sense if one looks at it in the form of currying. In summary, currying is the process
-  of applying a value to the first argument of a function taking more than one argument,
-  resulting in a function that takes the remaining arguments.
-
-  I.E:
-
-  'f(x,y) = z' => 'f(x) = y -> z' => 'f = x -> y -> z'
--}
-intAdder :: Int -> Int -> Int
-intAdder x y = x + y
-
-{-
-  The below is valid syntax. As demonstrated before, a function 'f(x,y) = z'
-  can become a partial function 'f(x) = y -> z', which is precisely what it returns,
-  a partial application of a function. Note as well that Haskell can automatically pass
-  arguments to the right-hand side of the definition of a function. In fact, 'intAdder'
-  could be defined as 'intAdder = (+)' as it would pass the first and second argument to
-  the 'plus' infix operator.
--}
-curriedIntAdder :: Int -> (Int -> Int)
-curriedIntAdder = intAdder
-
-{-
-  Functions
--}
-genericAdder :: (Num a) => a -> a -> a
-genericAdder x y = x + y
-
-main :: IO ()
-main = return ()
+  -- Etc...

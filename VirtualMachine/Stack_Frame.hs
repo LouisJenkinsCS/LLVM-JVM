@@ -18,67 +18,38 @@ module VirtualMachine.Stack_Frame where
     reference.
   -}
   pushFrame :: Runtime_Environment -> Method -> IO ()
-  pushFrame env meth = createFrame >>= \f -> modifyIORef' (stack env) ((:) f)
+  pushFrame env meth = modifyIORef (stack env) ((:) createFrame)
     where
-      createFrame :: IO StackFrame
-      createFrame = newIORef [] >>= \opStack -> return $ newArray (0, method_locals meth - 1) 0 >>=
-        \locals -> newIORef (Frame locals opStack toCodeSegment)
-        where
-          toCodeSegment :: Code_Segment
-          toCodeSegment = newIORef 0 >>= \pc -> Code (method_code meth) pc
+      createFrame :: StackFrame
+      createFrame = undefined
+
+
   {-
     Pushes a value on the operand stack
   -}
-  pushOp :: Operand -> StackFrame -> IO ()
-  pushOp val frame = readIORef frame >>= \f -> modifyIORef (opStack f) (\old -> val : old)
+  pushOp :: StackFrame -> Operand -> IO ()
+  pushOp frame val = readIORef frame >>= \f -> modifyIORef (operand_stack f) (\old -> val : old)
 
   {-
     Pops the operand off of the stack
   -}
   popOp :: StackFrame -> IO Operand
   -- IORef can also be modified via 'writeIORef'
-  popOp frame = readIORef frame >>= \f -> readIORef (opStack f)
-    >>= \ops -> writeIORef (opStack f) (tail ops) >> return (head ops)
+  popOp frame = readIORef frame >>= \f -> readIORef (operand_stack f)
+    >>= \ops -> writeIORef (operand_stack f) (tail ops) >> return (head ops)
 
   {-
     Pushes a value as a local variable at the given index.
   -}
-  putLocal :: Word16 -> Value -> StackFrame -> IO ()
-  putLocal idx val frame = readIORef frame >>= \f -> writeArray (locals f) idx val
+  putLocal :: (Integral a) => StackFrame -> a -> Value -> IO ()
+  putLocal frame idx val = readIORef frame >>= \f -> writeArray (local_variables f) (fromIntegral idx) val
 
   {-
     Returns the value associated the given index.
   -}
-  getLocal :: Word16 -> StackFrame -> IO Local_Variable
-  getLocal idx frame = readIORef frame >>= \f -> readArray (locals f) idx
+  getLocal :: (Integral a) => StackFrame -> a -> IO Local_Variable
+  getLocal frame idx = readIORef frame >>= \f -> readArray (local_variables f) (fromIntegral idx)
 
-  {-
-    Obtains the next WORD-sized (4-byte, Word32) local variable from the stack.
-  -}
-  getLocalWORD :: Word16 -> StackFrame -> IO Word32
-  getLocalWORD idx frame = fromIntegral <$> getLocal idx frame
-
-  {-
-    Obtains the next DWORD-sized (8-bytes, Word64) local variable from the stack.
-    As 'locals' is segmented in WORD-sized slots (4-bytes, Word32), in big-endian
-    order (higher byte first), we must obtain index 'n' and 'n+1' and combine
-    them (I.E: In C -> high_word << 32 | low_word).
-  -}
-  getLocalDWORD :: Word16 -> StackFrame -> IO Word64
-  getLocalDWORD idx frame = asDWORD <$> getLocalWORD idx frame <*> getLocalWORD (idx + 1) frame
-      where
-        asDWORD high low = fromIntegral $ high `shift` 32 .|. low
-
-  {-
-    Helper function to convert to appropriate type
-  -}
-  popWORD :: StackFrame -> IO Word32
-  popWORD frameRef = fromIntegral <$> popOp frameRef
-
-  popDWORD :: StackFrame -> IO Word64
-  popDWORD frameRef = asDWORD <$> replicateM 2 (popOp frameRef)
-    where
-      asDWORD (high:low:_) = fromIntegral $ high `shift` 32 .|. low
   {-
     Pops off N operands off of the stack
   -}
