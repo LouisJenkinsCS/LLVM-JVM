@@ -87,6 +87,7 @@ module VirtualMachine.ByteCode where
     | bc == 128 || bc == 129 = applyBinaryOp (.|.)
     | bc == 130 || bc == 131 = applyBinaryOp xor
     | bc == 132 = increment
+    | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
       where
         applyUnaryOp :: (Operand -> Operand) -> IO ()
         applyUnaryOp f = popOp frame >>= pushOp frame . f

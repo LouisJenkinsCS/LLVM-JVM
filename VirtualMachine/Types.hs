@@ -26,6 +26,89 @@ module VirtualMachine.Types where
   -- LV_Reference gets garbage collected by Haskell's GC.
   data Value = VInt Int | VLong Integer| VFloat Float | VDouble Double | VReference Object deriving (Eq, Ord, Show)
 
+  -- liftValue :: (a -> a) -> Value -> Value
+  -- liftValue f (VInt x) = VInt (f x)
+  -- liftValue f (VLong x) = VLong (f x)
+  -- liftValue f (VFloat x) = VFloat (f x)
+  -- liftValue f (VDouble x) = VDouble (f x)
+  --
+  -- liftValue2 :: Num a => (a -> a -> a) -> Value -> Value -> Value
+  -- liftValue2 f (VInt x) (VInt y) = VInt (f x y)
+  -- liftValue2 f (VLong x) (VLong y) = VLong (f x y)
+  -- liftValue2 f (VFloat x) (VFloat y) = VFloat (f x y)
+  -- liftValue2 f (VDouble x) (VDouble y) = VDouble (f x y)
+
+
+  liftVInt :: (Int -> Int) -> Value -> Value
+  liftVInt f (VInt x) = VInt (f x)
+  liftVInt2 :: (Int -> Int -> Int) -> Value -> Value -> Value
+  liftVInt2 f (VInt x) (VInt y) = VInt (f x y)
+
+  liftVLong :: (Integer -> Integer) -> Value -> Value
+  liftVLong f (VLong x) = VLong (f x)
+  liftVLong2 :: (Integer -> Integer -> Integer) -> Value -> Value -> Value
+  liftVLong2 f (VLong x) (VLong y) = VLong (f x y)
+
+  liftVFloat :: (Float -> Float) -> Value -> Value
+  liftVFloat f (VFloat x) = VFloat (f x)
+  liftVFloat2 :: (Float -> Float -> Float) -> Value -> Value -> Value
+  liftVFloat2 f (VFloat x) (VFloat y) = VFloat (f x y)
+
+  liftVDouble :: (Double -> Double) -> Value -> Value
+  liftVDouble f (VDouble x) = VDouble (f x)
+  liftVDouble2 :: (Double -> Double -> Double) -> Value -> Value -> Value
+  liftVDouble2 f (VDouble x) (VDouble y) = VDouble (f x y)
+
+
+  instance Num Value where
+    (+) (VInt x) (VInt y) = VInt (x + y)
+    (+) (VLong x) (VLong y) = VLong (x + y)
+    (+) (VFloat x) (VFloat y) = VFloat (x + y)
+    (+) (VDouble x) (VDouble y) = VDouble (x + y)
+    (+) _ _ = error "Bad Op: Addition"
+
+    (-) (VInt x) (VInt y) = VInt (x - y)
+    (-) (VLong x) (VLong y) = VLong (x - y)
+    (-) (VFloat x) (VFloat y) = VFloat (x - y)
+    (-) (VDouble x) (VDouble y) = VDouble (x - y)
+    (-) _ _ = error "Bad Op: Subtraction"
+
+    (*) (VInt x) (VInt y) = VInt (x * y)
+    (*) (VLong x) (VLong y) = VLong (x * y)
+    (*) (VFloat x) (VFloat y) = VFloat (x * y)
+    (*) (VDouble x) (VDouble y) = VDouble (x * y)
+    (*) _ _ = error "Bad Op: Multiplication"
+
+  instance Real Value where
+    toRational (VInt x) = toRational x
+    toRational (VLong x) = toRational x
+    toRational (VFloat x) = toRational x
+    toRational (VDouble x) = toRational x
+    toRational _ = error "Bad Op: toRational"
+
+  instance Enum Value where
+    toEnum _ = error "Bad Op: toEnum"
+    fromEnum _ = error "Bad Op: fromEnum"
+
+  instance Integral Value where
+    div (VInt x) (VInt y) = VInt (x `div` y)
+    div (VLong x) (VLong y) = VLong (x `div` y)
+    div (VFloat x) (VFloat y) = VFloat (x / y)
+    div (VDouble x) (VDouble y) = VDouble (x / y)
+    div _ _ = error "Bad Op: div"
+
+  instance Bits Value where
+    shift (VInt x) = VInt . shift x
+    shift _ = error "Bad Op: shift"
+
+    (.|.) (VInt x) (VInt y) = VInt (x .|. y)
+    (.|.) _ _ = error "Bad Op: (.|.)"
+
+    (.&.) (VInt x) (VInt y) = VInt (x .&. y)
+    (.&.) _ _ = error "Bad Op: (.&.)"
+
+    xor (VInt x) (VInt y) = VInt (x `xor` y)
+    xor _ _ = error "Bad Op: xor"
 
   type Local_Variable = Value
 
