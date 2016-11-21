@@ -10,137 +10,66 @@ module VirtualMachine.ByteCode where
   execute' frame bc instrRef
     -- NOP
     | bc == 0 = return ()
-    -- *CONST*
+    -- Constants
     | bc >= 1 && bc <= 15 = constOp frame bc
     -- BIPUSH BYTE
-    | bc == 16 = do
-      byte <- getNextBC instrRef
-      pushOp (fromIntegral byte) frame
+    | bc == 16 = getNextBC frame >>= pushOp frame . fromIntegral
     -- SIPUSH BYTE1 BYTE2
-    | bc == 17 = do
-      byte1 <- getNextBC instrRef
-      byte2 <- getNextBC instrRef
-      pushOp (fromIntegral byte1 `shift` 8 .|. fromIntegral byte2) frame
+    | bc == 17 = replicateM 2 (getNextBC frame) >>= \(b1:b2:_) -> pushOp frame (fromIntegral b1 `shift` 8 .|. fromIntegral b2)
     -- LDC* (TODO)
-    -- *LOAD*
-    | bc >= 21 && bc <= 53 = loadOp frame bc instrRef
-    -- *STORE*
-    | bc >= 54 && bc <= 86 = storeOp frame bc instrRef
-    -- Math Operations
+    -- Loads
+    | bc >= 21 && bc <= 53 = loadOp frame bc
+    -- Stores
+    | bc >= 54 && bc <= 86 = storeOp frame bc
+    -- Math
     | bc >= 96 && bc <= 132 = mathOp frame bc
-    -- RETURN
+    -- Return
     | bc == 177 = return ()
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
   execute :: StackFrame -> IO ()
   execute frame = do
     f <- readIORef frame
-    let instrRef = instructions f
-    instr <- readIORef instrRef
+    let instr = byte_code . code_segment $ f
     case length instr of
       0 -> return ()
       _ -> do
-        bc <- getNextBC instrRef
-        execute' frame bc instrRef
+        bc <- getNextBC frame
+        execute' frame bc instr
         execute frame
 
 
   constOp :: StackFrame -> ByteCode -> IO ()
   constOp frame bc
     -- ACONST_NULL
-    | bc == 1 = pushOp 0 frame
+    | bc == 1 = pushOp frame (VReference 0)
     -- ICONST_*
-    | bc >= 2 && bc <= 8 = pushOp (fromIntegral $ bc - 3) frame
+    | bc >= 2 && bc <= 8 = pushOp frame (VInt (fromIntegral $ bc - 3))
     -- LCONST_*
-    | bc == 9 || bc == 10 = pushOp (fromIntegral $ bc - 9) frame
+    | bc == 9 || bc == 10 = pushOp frame (VLong (fromIntegral $ bc - 9))
     -- FCONST_*
-    | bc >= 11 && bc <= 13 = pushOp (fromIntegral $ bc - 11) frame
+    | bc >= 11 && bc <= 13 = pushOp frame (VFloat (fromIntegral $ bc - 11))
     -- DCONST_*
-    | bc >= 14 && bc <= 15 = pushOp (fromIntegral $ bc - 14) frame
+    | bc >= 14 && bc <= 15 = pushOp frame (VDouble (fromIntegral $ bc - 14))
     --
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
-  loadOp :: StackFrame -> Code_Segment -> IO ()
-  loadOp frame
-    -- ILOAD || FLOAD || ALOAD
-    | bc == 21 || bc == 23 || bc == 25 = do
-      idx <- getNextBC frame
-      local <- getLocalWORD (fromIntegral idx) frame
-      pushOp (fromIntegral local) frame
-    -- LLOAD || DLOAD
-    | bc == 22 || bc == 24 = do
-      idx <- getNextBC instrRef
-      local <- getLocalDWORD (fromIntegral idx) frame
-      pushOp (fromIntegral local) frame
-    -- ILOAD_*
-    | bc >= 26 && bc <= 29 = do
-      local <- getLocalWORD (fromIntegral $ bc - 26) frame
-      pushOp (fromIntegral local) frame
-    -- LLOAD_*
-    | bc >= 30 && bc <= 33 = do
-      let idx = fromIntegral $ bc - 30
-      local <- getLocalDWORD idx frame
-      pushOp (fromIntegral local) frame
-    -- FLOAD_*
-    | bc >= 34 && bc <= 37 = do
-      local <- getLocalWORD (fromIntegral $ bc - 34) frame
-      pushOp (fromIntegral local) frame
-    -- DLOAD_*
-    | bc >= 38 && bc <= 41 = do
-      let idx = fromIntegral $ bc - 38
-      local <- getLocalDWORD idx frame
-      pushOp (fromIntegral local) frame
-    -- ALOAD_*
-    | bc >= 42 && bc <= 45 = do
-      local <- getLocalWORD (fromIntegral $ bc - 42) frame
-      pushOp (fromIntegral local) frame
-    -- *ALOAD (TODO)
+  loadOp :: StackFrame -> ByteCode -> IO ()
+  loadOp frame bc
+    -- Loads which have the index as the next bytecode instruction
+    | bc >= 21 && bc <=25 = getNextBC frame >>= getLocal frame >>= pushOp frame
+    -- Loads which have a constant index (I.E: ILOAD_0 to ILOAD_3)
+    | bc >= 26 && bc <= 45 = getLocal frame ((bc - 26) `mod` 4) >>= pushOp frame
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
-  storeOp :: StackFrame -> ByteCode -> Code_Segment -> IO ()
-  storeOp frame bc instrRef
-    -- ISTORE || FSTORE || ASTORE
-    | bc == 54 || bc == 56 || bc == 58 = do
-      idx <- getNextBC instrRef
-      operand <- popOp frame
-      putLocal (fromIntegral idx) (fromIntegral operand) frame
-    -- LSTORE || DSTORE
-    | bc == 55 || bc == 57 = do
-      idx <- getNextBC instrRef
-      operand <- popOp frame
-      let high = operand `shiftR` 32
-      let low = operand .&. 0xFFFFFFFF
-      putLocal (fromIntegral idx) (fromIntegral high) frame
-      putLocal (fromIntegral $ idx + 1) (fromIntegral low) frame
-    -- ISTORE_*
-    | bc >= 59 && bc <= 62 = do
-      operand <- popOp frame
-      putLocal (fromIntegral $ bc - 59) (fromIntegral operand) frame
-    -- LSTORE_*
-    | bc >= 63 && bc <= 66 = do
-      let idx = fromIntegral $ bc - 63
-      operand <- popOp frame
-      let high = operand `shiftR` 32
-      let low = operand .&. 0xFFFFFFFF
-      putLocal (fromIntegral idx) (fromIntegral high) frame
-      putLocal (fromIntegral $ idx + 1) (fromIntegral low) frame
-    -- FSTORE_*
-    | bc >= 67 && bc <= 70 = do
-      operand <- popOp frame
-      putLocal (fromIntegral $ bc - 67) (fromIntegral operand) frame
-    -- DSTORE_*
-    | bc >= 71 && bc <= 74 = do
-      let idx = fromIntegral $ bc - 71
-      operand <- popOp frame
-      let high = operand `shiftR` 32
-      let low = operand .&. 0xFFFFFFFF
-      putLocal (fromIntegral idx) (fromIntegral high) frame
-      putLocal (fromIntegral $ idx + 1) (fromIntegral low) frame
-    -- ASTORE_*
-    | bc >= 75 && bc <= 78 = do
-      operand <- popOp frame
-      putLocal (fromIntegral $ bc - 75) (fromIntegral operand) frame
-    -- *ASTORE (TODO)
+  storeOp :: StackFrame -> ByteCode -> IO ()
+  storeOp frame bc
+    -- Stores which have the Index as the next bytecode instruction
+    | bc >= 54 && bc <= 58 = popOp frame >>= \op -> getNextBC frame >>= \idx -> putLocal frame idx op
+      >> when (bc == 55 || bc == 57) (putLocal frame (idx + 1) (VReference 0))
+    -- Stores which have a constant index
+    | bc >= 59 && bc <= 78 = popOp frame >>= putLocal frame ((bc - 59) `mod` 4)
+      >> when ((bc >= 63 && bc <= 66) || (bc >= 71 && bc <= 74)) (putLocal frame (((bc - 59) `mod` 4) + 1) (VReference 0))
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
   mathOp :: StackFrame -> ByteCode -> IO ()
