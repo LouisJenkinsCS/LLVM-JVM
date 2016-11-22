@@ -10,10 +10,12 @@ module VirtualMachine.Types where
 
   type Stack = IORef [StackFrame]
 
-  type StackFrame = IORef (Stack_Frame Int)
+  type StackFrame = IORef Stack_Frame
 
   type ByteCode = Word8
   type Instructions = [ByteCode]
+
+
 
   data Code_Segment = Code {
     byte_code :: Instructions,
@@ -110,7 +112,7 @@ module VirtualMachine.Types where
     xor (VInt x) (VInt y) = VInt (x `xor` y)
     xor _ _ = error "Bad Op: xor"
 
-  type Local_Variable = Value
+  type Local_Variable = IORef Value
 
   type Operand = Value
 
@@ -133,8 +135,7 @@ module VirtualMachine.Types where
 
   data Runtime_Environment = Environment {
     class_map :: IORef (Map String Class),
-    stack :: Stack,
-    debugMsgs :: [String]
+    stack :: Stack
   }
 
   -- newtype Runtime = Runtime { runRT :: Runtime_Environment -> IO () }
@@ -150,8 +151,8 @@ module VirtualMachine.Types where
 
 
 
-  data Stack_Frame a = Frame {
-    local_variables :: IOArray a Local_Variable,
+  data Stack_Frame = Frame {
+    local_variables :: [Local_Variable],
     operand_stack :: IORef [Operand],
     code_segment :: Code_Segment
   }

@@ -3,6 +3,7 @@ module VirtualMachine.ByteCode where
   import Data.Bits
   import Control.Monad
   import VirtualMachine.Types
+  import VirtualMachine.Debug
   import VirtualMachine.Stack_Frame
   import Data.Binary.IEEE754
 
@@ -29,6 +30,7 @@ module VirtualMachine.ByteCode where
 
   execute :: StackFrame -> IO ()
   execute frame = do
+    debugFrame frame >>= putStrLn
     f <- readIORef frame
     let instr = byte_code . code_segment $ f
     case length instr of
