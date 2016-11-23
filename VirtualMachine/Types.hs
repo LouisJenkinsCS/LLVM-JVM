@@ -101,6 +101,10 @@ module VirtualMachine.Types where
     div (VDouble x) (VDouble y) = VDouble (x / y)
     div _ _ = error "Bad Op: div"
 
+    toInteger (VInt x) = toInteger x
+    toInteger (VLong x) = toInteger x
+    toInteger _ = error "Bad Op: toInteger"
+
   instance Show Value where
     show (VInt x) = show x
     show (VLong x) = show x

@@ -1,5 +1,6 @@
 module DataTypes.Class_File where
   import Data.Word
+  import GHC.IO.Encoding
   import Data.ByteString.Char8 as CBS
   import qualified Data.ByteString as BS
   import ClassFile.Parser
@@ -12,6 +13,7 @@ module DataTypes.Class_File where
 
   main :: IO ()
   main = do
+    setLocaleEncoding utf8
     r0 <- BS.readFile "AdditionTest.class"
     Prelude.putStrLn $ "Starting Bytes: " ++ show (BS.length r0)
     let classFile = parseClassFile r0

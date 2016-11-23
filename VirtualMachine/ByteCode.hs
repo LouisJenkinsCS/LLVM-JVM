@@ -7,38 +7,31 @@ module VirtualMachine.ByteCode where
   import VirtualMachine.Stack_Frame
   import Data.Binary.IEEE754
 
-  execute' :: StackFrame -> ByteCode -> Instructions -> IO ()
-  execute' frame bc instrRef
-    -- NOP
-    | bc == 0 = return ()
-    -- Constants
-    | bc >= 1 && bc <= 15 = constOp frame bc
-    -- BIPUSH BYTE
-    | bc == 16 = getNextBC frame >>= pushOp frame . fromIntegral
-    -- SIPUSH BYTE1 BYTE2
-    | bc == 17 = replicateM 2 (getNextBC frame) >>= \(b1:b2:_) -> pushOp frame (fromIntegral b1 `shift` 8 .|. fromIntegral b2)
-    -- LDC* (TODO)
-    -- Loads
-    | bc >= 21 && bc <= 53 = loadOp frame bc
-    -- Stores
-    | bc >= 54 && bc <= 86 = storeOp frame bc
-    -- Math
-    | bc >= 96 && bc <= 132 = mathOp frame bc
-    -- Return
-    | bc == 177 = return ()
-    | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
-
   execute :: StackFrame -> IO ()
-  execute frame = do
-    debugFrame frame >>= putStrLn
-    f <- readIORef frame
-    let instr = byte_code . code_segment $ f
-    case length instr of
-      0 -> return ()
-      _ -> do
-        bc <- getNextBC frame
-        execute' frame bc instr
-        execute frame
+  execute frame = debugFrame frame >>= putStrLn >> readIORef frame >>= \f ->
+    readIORef (program_counter . code_segment $ f) >>= \pc ->
+    unless (fromIntegral pc >= length (byte_code . code_segment $ f)) $ getNextBC frame >>= execute' >> execute frame
+      where
+        execute' :: ByteCode -> IO ()
+        execute' bc
+          -- NOP
+          | bc == 0 = return ()
+          -- Constants
+          | bc >= 1 && bc <= 15 = constOp frame bc
+          -- BIPUSH BYTE
+          | bc == 16 = getNextBC frame >>= pushOp frame . fromIntegral
+          -- SIPUSH BYTE1 BYTE2
+          | bc == 17 = replicateM 2 (getNextBC frame) >>= \(b1:b2:_) -> pushOp frame (fromIntegral b1 `shift` 8 .|. fromIntegral b2)
+          -- LDC* (TODO)
+          -- Loads
+          | bc >= 21 && bc <= 53 = loadOp frame bc
+          -- Stores
+          | bc >= 54 && bc <= 86 = storeOp frame bc
+          -- Math
+          | bc >= 96 && bc <= 132 = mathOp frame bc
+          -- Return
+          | bc == 177 = return ()
+          | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
 
   constOp :: StackFrame -> ByteCode -> IO ()
@@ -76,7 +69,7 @@ module VirtualMachine.ByteCode where
 
   mathOp :: StackFrame -> ByteCode -> IO ()
   mathOp frame bc
-    | bc >= 96 && bc >= 99 = applyBinaryOp (+)
+    | bc >= 96 && bc <= 99 = applyBinaryOp (+)
     | bc >= 100 && bc <= 103 = applyBinaryOp (-)
     | bc >= 104 && bc <= 107 = applyBinaryOp (*)
     | bc >= 108 && bc <= 111 = applyBinaryOp div
@@ -94,7 +87,7 @@ module VirtualMachine.ByteCode where
         applyUnaryOp :: (Operand -> Operand) -> IO ()
         applyUnaryOp f = popOp frame >>= pushOp frame . f
         applyBinaryOp :: (Operand -> Operand -> Operand) -> IO ()
-        applyBinaryOp f = replicateM 2 (popOp frame) >>= \(x:y:_) -> pushOp frame (f x y)
+        applyBinaryOp f = replicateM 2 (popOp frame) >>= \(x:y:_) -> pushOp frame (f y x)
         increment :: IO ()
         increment = getNextBC frame >>= getLocal frame >>= \l -> getNextBC frame >>= \n -> pushOp frame (l + fromIntegral n)
 
