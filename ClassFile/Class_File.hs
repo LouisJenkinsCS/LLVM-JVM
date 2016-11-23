@@ -10,7 +10,6 @@ module DataTypes.Class_File where
 
 
 
-
   main :: IO ()
   main = do
     r0 <- BS.readFile "AdditionTest.class"

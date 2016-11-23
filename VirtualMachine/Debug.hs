@@ -1,17 +1,27 @@
 module VirtualMachine.Debug where
   import VirtualMachine.Types
   import Data.IORef
+  import Data.Word
   import Data.Array.MArray
   import Control.Monad
   import Data.List
+  import System.Console.ANSI
 
   debugFrame :: StackFrame -> IO String
   debugFrame frame = readIORef frame >>= \f -> readIORef (operand_stack f)
     >>= \opstack -> mapM (readIORef >=> return . show) (local_variables f) >>= \localStr ->
-    readIORef (program_counter . code_segment $ f) >>= \pc -> let instr = byte_code . code_segment $ f
-    in return $ "Stack_Frame{locals:[" ++ intercalate "," localStr
-    ++ "],Operand: " ++ show opstack ++ ",PC: " ++ show pc ++ ",Next:" ++ printBC (instr !! fromIntegral pc)
-    ++ ",Code Segment: " ++ intercalate ", " (map printBC instr) ++ "}"
+    formatCodeSegment (code_segment f) >>= \csStr -> return $ "Stack_Frame{local_variables:[" ++ intercalate "," localStr
+    ++ "],operand_stack:" ++ show opstack ++ ",code_segment:[" ++ csStr ++ "]}"
+    where
+      formatCodeSegment :: Code_Segment -> IO String
+      formatCodeSegment cs = readIORef (program_counter cs) >>= \pc -> printCodeSegment 0 pc (byte_code cs)
+        where
+          printCodeSegment :: Word32 -> Word32 -> Instructions -> IO String
+          printCodeSegment n m instr
+            | n == (fromIntegral . length $ instr) = return ""
+            | n == m = setSGR [SetConsoleIntensity BoldIntensity] >> return (">>" ++ printBC (instr !! fromIntegral n) ++ "<<,")
+              >>= \str -> (++) str <$> (setSGR [SetConsoleIntensity NormalIntensity] >> printCodeSegment (n + 1) m instr)
+            | otherwise = (++) (printBC (instr !! fromIntegral n) ++ ",") <$> printCodeSegment (n + 1) m instr
 
   -- Generated with Regular Expressions
   printBC :: ByteCode -> String
