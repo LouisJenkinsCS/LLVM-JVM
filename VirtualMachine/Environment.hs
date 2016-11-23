@@ -1,7 +1,5 @@
 module VirtualMachine.Environment where
   import Data.IORef
-  import GHC.IOArray
-  import Data.Word
   import qualified Data.Map as Map
   import VirtualMachine.Types
   import ClassFile.Types
@@ -11,10 +9,11 @@ module VirtualMachine.Environment where
   import Data.Maybe
 
   init :: IO Runtime_Environment
-  init = Environment <$> newIORef Map.empty <*> newIORef []
+  init = Environment undefined <$> newIORef Map.empty <*> newIORef []
 
   loadClass :: Runtime_Environment -> ClassFile -> IO ()
   loadClass env cf = toClass cf >>= \c -> modifyIORef' (class_map env) (Map.insert classString c)
+    >> writeIORef (current_class env) c
       where
         classString :: String
         classString = let
@@ -27,20 +26,3 @@ module VirtualMachine.Environment where
   start env = putStrLn "Starting..." >> (fromJust . Map.lookup "main") <$> ((snd . head . Map.toList)
     <$> readIORef (class_map env) >>= readIORef . method_map)
     >>= pushFrame env >> putStrLn "Created stack for main..." >> readIORef (stack env) >>= execute . head
-
-  getMain :: [CP_Info] -> [Method_Info] -> Method_Info
-  getMain cp (x:xs)
-    | show (utf8_bytes (cp !! fromIntegral (method_name_index x))) == "main" = x
-    | otherwise = getMain cp xs
-  getMain _ [] = error "Main not found"
-
-  getCodeAttribute :: [CP_Info] -> [Attribute_Info] -> Attribute_Info
-  getCodeAttribute = findCodeAttribute
-    where
-      findCodeAttribute :: [CP_Info] -> [Attribute_Info] -> Attribute_Info
-      findCodeAttribute cp (x:xs) = let
-        nindex = attribute_name_index x
-        name = show $ utf8_bytes $ cp !! fromEnum nindex
-        in
-          if name == "Code" then x else findCodeAttribute cp xs
-      findCodeAttribute _ [] = undefined

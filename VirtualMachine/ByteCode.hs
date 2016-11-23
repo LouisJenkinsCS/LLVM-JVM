@@ -3,17 +3,29 @@ module VirtualMachine.ByteCode where
   import Data.Bits
   import Control.Monad
   import VirtualMachine.Types
+  import ClassFile.Types
   import VirtualMachine.Debug
   import VirtualMachine.Stack_Frame
   import Data.Binary.IEEE754
 
-  execute :: StackFrame -> IO ()
-  execute frame = debugFrame frame >>= putStrLn >> readIORef frame >>= \f ->
-    readIORef (program_counter . code_segment $ f) >>= \pc ->
-    unless (fromIntegral pc >= length (byte_code . code_segment $ f)) $ getNextBC frame >>= execute' >> execute frame
+  loadConstantPool :: Runtime_Environment -> Int -> IO Value
+  loadConstantPool env idx = (!! idx) . constant_pool <$> readIORef (current_class env) >>= toValue
+    where
+      toValue :: CP_Info -> IO Value
+      toValue info = return $ case tag info of
+        3 -> VInt . fromIntegral . bytes $ info
+        4 -> VFloat . wordToFloat . bytes $ info
+        5 -> VLong (fromIntegral . high_bytes $ info) `shift` 32  .|. (fromIntegral . low_bytes $ info)
+        6 -> VDouble . wordToDouble $ (fromIntegral . high_bytes $ info) `shift` 32  .|. (fromIntegral . low_bytes $ info)
+        _ -> error $ "Bad Tag: " ++ show (tag info)
+
+  execute :: Runtime_Environment -> IO ()
+  execute env = head <$> readIORef (stack env) >>= \frame -> debugFrame frame >>= putStrLn
+    >> readIORef frame >>= \f -> readIORef (program_counter . code_segment $ f) >>= \pc ->
+    unless (fromIntegral pc >= length (byte_code . code_segment $ f)) $ getNextBC frame >>= execute' frame >> execute env
       where
-        execute' :: ByteCode -> IO ()
-        execute' bc
+        execute' :: StackFrame -> ByteCode -> IO ()
+        execute' frame bc
           -- NOP
           | bc == 0 = return ()
           -- Constants
@@ -22,7 +34,11 @@ module VirtualMachine.ByteCode where
           | bc == 16 = getNextBC frame >>= pushOp frame . fromIntegral
           -- SIPUSH BYTE1 BYTE2
           | bc == 17 = replicateM 2 (getNextBC frame) >>= \(b1:b2:_) -> pushOp frame (fromIntegral b1 `shift` 8 .|. fromIntegral b2)
-          -- LDC* (TODO)
+          -- LDC IDX
+          | bc == 18 = getNextBC frame >>= loadConstantPool env . fromIntegral >>= pushOp frame
+          -- LDC2* IDX1 IDX2
+          | bc == 19 || bc == 20 = replicateM 2 (getNextBC frame) >>= \(i1:i2:_) ->
+            loadConstantPool env  (fromIntegral i1 `shift` 8 .|. fromIntegral i2) >>= pushOp frame
           -- Loads
           | bc >= 21 && bc <= 53 = loadOp frame bc
           -- Stores

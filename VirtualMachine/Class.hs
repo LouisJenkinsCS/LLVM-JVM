@@ -14,7 +14,7 @@ module VirtualMachine.Class where
           extractMethod info =
             let name = show . utf8_bytes $ cp_info cf !! (fromIntegral . method_name_index $ info)
                 code_info = extractCode (method_attributes info)
-                method = Method (code code_info) (max_locals code_info)
+                method = Method { method_code = code code_info, method_locals = max_locals code_info}
               in (name, method)
                 where
                   extractCode :: [Attribute_Info] -> Attribute_Info

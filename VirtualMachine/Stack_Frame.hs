@@ -6,8 +6,6 @@ module VirtualMachine.Stack_Frame where
   import VirtualMachine.Types
   import Data.Array.IO
 
-
-
   createFrame :: Method -> IO StackFrame
   createFrame meth = createFrame' >>= \f -> newIORef f
   -- { local_variables = newArray (0 :: Int, (fromIntegral . method_locals $ meth) - 1) (VReference 0) }
@@ -28,6 +26,7 @@ module VirtualMachine.Stack_Frame where
             createLocals n
               | n == 0 = return []
               | n > 0 =  newIORef (VReference 0) >>= \l -> createLocals (n - 1) >>= \l' -> return $ l : l'
+              | otherwise = error $ "Error while attempting to create locals: n=" ++ show n
 
 
   {-

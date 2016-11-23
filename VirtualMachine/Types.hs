@@ -147,6 +147,7 @@ module VirtualMachine.Types where
   type Bitmap = [Word8]
 
   data Runtime_Environment = Environment {
+    current_class :: IORef Class,
     class_map :: IORef (Map String Class),
     stack :: Stack
   }
