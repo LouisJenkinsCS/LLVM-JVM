@@ -6,7 +6,9 @@ module VirtualMachine.Types where
   import Data.Array.IO
   import ClassFile.Types
   import Control.Monad
+  import Text.Printf
   import Data.STRef
+  import Numeric
 
   type Stack = IORef [StackFrame]
 
@@ -26,7 +28,7 @@ module VirtualMachine.Types where
   type Object = Int
 
   -- LV_Reference gets garbage collected by Haskell's GC.
-  data Value = VInt Int | VLong Integer| VFloat Float | VDouble Double | VReference Object deriving (Eq, Ord, Show)
+  data Value = VInt Int | VLong Integer| VFloat Float | VDouble Double | VReference Object deriving (Eq, Ord)
 
   -- liftValue :: (a -> a) -> Value -> Value
   -- liftValue f (VInt x) = VInt (f x)
@@ -98,6 +100,13 @@ module VirtualMachine.Types where
     div (VFloat x) (VFloat y) = VFloat (x / y)
     div (VDouble x) (VDouble y) = VDouble (x / y)
     div _ _ = error "Bad Op: div"
+
+  instance Show Value where
+    show (VInt x) = show x
+    show (VLong x) = show x
+    show (VFloat x) = show x
+    show (VDouble x) = show x
+    show (VReference x) = printf "0x%X" x
 
   instance Bits Value where
     shift (VInt x) = VInt . shift x

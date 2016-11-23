@@ -119,12 +119,12 @@ module ClassFile.Parser where
   parseMethods :: [CP_Info] -> Parser [Method_Info]
   parseMethods cp = getNextShort >>= \n -> replicateM (fromIntegral n) parseMethod
     where
-      parseMethod = Method <$> getNextShort <*> getNextShort <*> getNextShort <*> parseAttributes cp
+      parseMethod = Method_Info <$> getNextShort <*> getNextShort <*> getNextShort <*> parseAttributes cp
 
   parseFields :: [CP_Info] -> Parser [Field_Info]
   parseFields cp = getNextShort >>= \n -> replicateM (fromIntegral n) parseField
     where
-      parseField = Field <$> getNextShort <*> getNextShort <*> getNextShort <*> parseAttributes cp
+      parseField = Field_Info <$> getNextShort <*> getNextShort <*> getNextShort <*> parseAttributes cp
 
   parseInterfaces :: Parser [Word16]
   parseInterfaces = getNextShort >>= \n -> replicateM (fromIntegral n) getNextShort

@@ -125,7 +125,7 @@ module ClassFile.Types where
     Method
   -}
 
-  data Method_Info = Method {
+  data Method_Info = Method_Info {
     method_access_flags :: Word16,
     method_name_index :: Word16,
     method_descriptor_index :: Word16,
@@ -133,7 +133,7 @@ module ClassFile.Types where
   }
 
   instance Show Method_Info where
-    show (Method aflags nindex dindex attrs) = "Method: {access_flags:" ++
+    show (Method_Info aflags nindex dindex attrs) = "Method: {access_flags:" ++
       showAccFlags aflags ++ ",name_index:" ++ show nindex ++ ",descriptor_index:" ++
       show dindex ++ ",attribute_count:" ++ show (Prelude.length attrs) ++ ",attributes:" ++ show attrs ++ "}\n"
 
@@ -159,7 +159,7 @@ module ClassFile.Types where
     Field
   -}
 
-  data Field_Info = Field {
+  data Field_Info = Field_Info {
     field_access_flags :: Word16,
     field_name_index :: Word16,
     field_descriptor_index :: Word16,
@@ -167,6 +167,6 @@ module ClassFile.Types where
   }
 
   instance Show Field_Info where
-    show (Field aflags nindex dindex attrs) = "Field: {access_flags:" ++
+    show (Field_Info aflags nindex dindex attrs) = "Field: {access_flags:" ++
       show aflags ++ ",name_index:" ++ show nindex ++ ",descriptor_index:" ++
       show dindex ++ ",attribute_count:" ++ show (Prelude.length attrs) ++ ",attributes:" ++ show attrs ++ "}\n"

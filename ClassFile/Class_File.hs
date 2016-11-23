@@ -19,12 +19,7 @@ module DataTypes.Class_File where
     Prelude.putStrLn $ show classFile
     Prelude.putStrLn "Initializing Runtime Environment..."
     env <- VirtualMachine.Environment.init
-    Prelude.putStrLn "Loading bootstrap class file..."
-    let m = getMain (cp_info classFile) (methods classFile)
-    let codeAttr = getCodeAttribute (cp_info classFile) (method_attributes m)
-    pushFrame stack (max_locals codeAttr) (code codeAttr)
-    str' <- debugStack stack
-    Prelude.putStrLn $ "Post-Stack: " ++ str'
-    debugExec stack
-    str'' <- debugStack stack
-    Prelude.putStrLn $ "Final-Stack: " ++ str''
+    Prelude.putStrLn "Loading bootstrap class..."
+    loadClass env classFile
+    Prelude.putStrLn "Starting Virtual Machine..."
+    VirtualMachine.Environment.start env

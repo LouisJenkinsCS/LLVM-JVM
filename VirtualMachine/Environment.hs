@@ -6,6 +6,8 @@ module VirtualMachine.Environment where
   import VirtualMachine.Types
   import ClassFile.Types
   import VirtualMachine.Class
+  import VirtualMachine.Stack
+  import VirtualMachine.ByteCode
   import Data.Maybe
 
   init :: IO Runtime_Environment
@@ -22,7 +24,9 @@ module VirtualMachine.Environment where
           in show $ utf8_bytes name
 
   start :: Runtime_Environment -> IO ()
-  start env = readIORef (class_map env) >>= Map.filter (\c -> readIORef (method_map c) >>= isJust . Map.lookup "main")
+  start env = putStrLn "Starting..." >> (fromJust . Map.lookup "main") <$> ((snd . head . Map.toList)
+    <$> readIORef (class_map env) >>= readIORef . method_map)
+    >>= pushFrame env >> putStrLn "Created stack for main..." >> readIORef (stack env) >>= execute . head
 
   getMain :: [CP_Info] -> [Method_Info] -> Method_Info
   getMain cp (x:xs)

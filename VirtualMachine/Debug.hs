@@ -2,11 +2,16 @@ module VirtualMachine.Debug where
   import VirtualMachine.Types
   import Data.IORef
   import Data.Array.MArray
+  import Control.Monad
+  import Data.List
 
   debugFrame :: StackFrame -> IO String
-  debugFrame frame = readIORef frame >>= \f -> getElems (local_variables f)
-    >>= \locals -> readIORef (operand_stack f) >>= \opstack ->  let instr = byte_code . code_segment $ f in
-    return $ "Stack_Frame{locals:" ++ show locals ++ ",opStack:" ++ show opstack ++ ",instr:" ++ show (map printBC instr) ++ "}"
+  debugFrame frame = readIORef frame >>= \f -> readIORef (operand_stack f)
+    >>= \opstack -> mapM (readIORef >=> return . show) (local_variables f) >>= \localStr ->
+    readIORef (program_counter . code_segment $ f) >>= \pc -> let instr = byte_code . code_segment $ f
+    in return $ "Stack_Frame{locals:[" ++ intercalate "," localStr
+    ++ "],Operand: " ++ show opstack ++ ",PC: " ++ show pc ++ ",Next:" ++ printBC (instr !! fromIntegral pc)
+    ++ ",Code Segment: " ++ intercalate ", " (map printBC instr) ++ "}"
 
   -- Generated with Regular Expressions
   printBC :: ByteCode -> String
