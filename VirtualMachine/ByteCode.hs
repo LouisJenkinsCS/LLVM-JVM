@@ -49,22 +49,11 @@ module VirtualMachine.ByteCode where
           | bc == 177 = return ()
           | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
-
-  constOp :: StackFrame -> ByteCode -> IO ()
-  constOp frame bc
-    -- ACONST_NULL
-    | bc == 1 = pushOp frame (VReference 0)
-    -- ICONST_*
-    | bc >= 2 && bc <= 8 = pushOp frame (VInt (fromIntegral $ bc - 3))
-    -- LCONST_*
-    | bc == 9 || bc == 10 = pushOp frame (VLong (fromIntegral $ bc - 9))
-    -- FCONST_*
-    | bc >= 11 && bc <= 13 = pushOp frame (VFloat (fromIntegral $ bc - 11))
-    -- DCONST_*
-    | bc >= 14 && bc <= 15 = pushOp frame (VDouble (fromIntegral $ bc - 14))
-    --
-    | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
-
+  {-
+    Loads transfer values from a slot in the Local Variable array to the Operand
+    Stack. Note as well that we can safely ignore the second index for DWORD-sized
+    variables.
+  -}
   loadOp :: StackFrame -> ByteCode -> IO ()
   loadOp frame bc
     -- Loads which have the index as the next bytecode instruction
@@ -73,6 +62,13 @@ module VirtualMachine.ByteCode where
     | bc >= 26 && bc <= 45 = getLocal frame ((bc - 26) `mod` 4) >>= pushOp frame
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
+  {-
+    Stores transfer the top value of the Operand Stack to an indice in the
+    Local Variable array. The JVM specification specifies that for DWORD sized
+    types (I.E: Long and Double) take up two slots in the Local Variable
+    array (the lower index contains the higher WORD, higher index contains the
+    lower WORD), so we store a dummy value (Null reference) in the higher index.
+  -}
   storeOp :: StackFrame -> ByteCode -> IO ()
   storeOp frame bc
     -- Stores which have the Index as the next bytecode instruction
@@ -80,9 +76,28 @@ module VirtualMachine.ByteCode where
       >> when (bc == 55 || bc == 57) (putLocal frame (idx + 1) (VReference 0))
     -- Stores which have a constant index
     | bc >= 59 && bc <= 78 = popOp frame >>= putLocal frame ((bc - 59) `mod` 4)
-      >> when ((bc >= 63 && bc <= 66) || (bc >= 71 && bc <= 74)) (putLocal frame (((bc - 59) `mod` 4) + 1) (VReference 0))
+      >> when ((bc >= 63 && bc <= 66) || (bc >= 71 && bc <= 74))
+      (putLocal frame (((bc - 59) `mod` 4) + 1) (VReference 0))
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
+
+  {- Stores constant values on the Operand Stack. -}
+  constOp :: StackFrame -> ByteCode -> IO ()
+  constOp frame bc
+    -- Null Reference
+    | bc == 1 = pushOp frame (VReference 0)
+    -- Integer Constants
+    | bc >= 2 && bc <= 8 = pushOp frame (VInt (fromIntegral $ bc - 3))
+    -- Long Constants
+    | bc == 9 || bc == 10 = pushOp frame (VLong (fromIntegral $ bc - 9))
+    -- Float Constants
+    | bc >= 11 && bc <= 13 = pushOp frame (VFloat (fromIntegral $ bc - 11))
+    -- Double Constants
+    | bc >= 14 && bc <= 15 = pushOp frame (VDouble (fromIntegral $ bc - 14))
+    -- ERROR
+    | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
+
+  {- Math operations which are abstracted by the Value type. -}
   mathOp :: StackFrame -> ByteCode -> IO ()
   mathOp frame bc
     | bc >= 96 && bc <= 99 = applyBinaryOp (+)
@@ -105,7 +120,8 @@ module VirtualMachine.ByteCode where
         applyBinaryOp :: (Operand -> Operand -> Operand) -> IO ()
         applyBinaryOp f = replicateM 2 (popOp frame) >>= \(x:y:_) -> pushOp frame (f y x)
         increment :: IO ()
-        increment = getNextBC frame >>= getLocal frame >>= \l -> getNextBC frame >>= \n -> pushOp frame (l + fromIntegral n)
+        increment = getNextBC frame >>= getLocal frame >>= \l -> getNextBC frame
+          >>= \n -> pushOp frame (l + fromIntegral n)
 
   getNextBC :: StackFrame -> IO ByteCode
   getNextBC frame = readIORef frame >>= \f -> -- Read StackFrame from passed reference

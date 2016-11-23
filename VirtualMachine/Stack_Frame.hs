@@ -6,9 +6,13 @@ module VirtualMachine.Stack_Frame where
   import VirtualMachine.Types
   import Data.Array.IO
 
+  {-
+    Constructs a stack frame from the passed method. Each stack frame keeps track
+    of it's local variables, operand stack, and code segment, which is composed
+    of the instructions and the current program counter.
+  -}
   createFrame :: Method -> IO StackFrame
-  createFrame meth = createFrame' >>= \f -> newIORef f
-  -- { local_variables = newArray (0 :: Int, (fromIntegral . method_locals $ meth) - 1) (VReference 0) }
+  createFrame meth = createFrame' >>= newIORef
     where
       createFrame' :: IO Stack_Frame
       createFrame' = newIORef ([] :: [Operand]) >>= \opstack -> newIORef 0 >>=
@@ -25,21 +29,19 @@ module VirtualMachine.Stack_Frame where
             createLocals :: Word16 -> IO [Local_Variable]
             createLocals n
               | n == 0 = return []
-              | n > 0 =  newIORef (VReference 0) >>= \l -> createLocals (n - 1) >>= \l' -> return $ l : l'
+              | n > 0 = (:) <$> newIORef (VReference 0) <*> createLocals (n - 1)
               | otherwise = error $ "Error while attempting to create locals: n=" ++ show n
-
 
   {-
     Pushes a value on the operand stack
   -}
   pushOp :: StackFrame -> Value -> IO ()
-  pushOp frame val = readIORef frame >>= \f -> modifyIORef (operand_stack f) (\old -> val : old)
+  pushOp frame val = (operand_stack <$> readIORef frame) >>= flip modifyIORef (val :)
 
   {-
     Pops the operand off of the stack
   -}
   popOp :: StackFrame -> IO Value
-  -- IORef can also be modified via 'writeIORef'
   popOp frame = readIORef frame >>= \f -> readIORef (operand_stack f)
     >>= \ops -> writeIORef (operand_stack f) (tail ops) >> return (head ops)
 

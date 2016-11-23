@@ -24,17 +24,3 @@ module VirtualMachine.Stack where
   -}
   pushFrame :: Runtime_Environment -> Method -> IO ()
   pushFrame env meth = createFrame meth >>= \f -> modifyIORef (stack env) ((:) f)
-
-  -- debugStack :: Runtime_Environment -> IO String
-  -- debugStack env = readIORef (stack env) >>= \s -> debugFrame' (length s) s
-  --   where
-  --     debugFrame' :: Int -> [StackFrame] -> IO String
-  --     debugFrame' idx frames
-  --       | idx == 0 = return ""
-  --       | otherwise = do
-  --           str  <- debugFrame $ frames !! (idx - 1)
-  --           next <- debugFrame' (idx-1) frames
-  --           return $ str ++ "," ++ next
-
-  -- debugExec :: Runtime_Environment -> IO ()
-  -- debugExec env = getCurrentFrame (stack env >>= execute

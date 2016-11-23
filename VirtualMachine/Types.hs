@@ -27,22 +27,6 @@ module VirtualMachine.Types where
   -- Temporary type until a proper heap is setup
   type Object = Int
 
-  -- LV_Reference gets garbage collected by Haskell's GC.
-  data Value = VInt Int | VLong Integer| VFloat Float | VDouble Double | VReference Object deriving (Eq, Ord)
-
-  -- liftValue :: (a -> a) -> Value -> Value
-  -- liftValue f (VInt x) = VInt (f x)
-  -- liftValue f (VLong x) = VLong (f x)
-  -- liftValue f (VFloat x) = VFloat (f x)
-  -- liftValue f (VDouble x) = VDouble (f x)
-  --
-  -- liftValue2 :: Num a => (a -> a -> a) -> Value -> Value -> Value
-  -- liftValue2 f (VInt x) (VInt y) = VInt (f x y)
-  -- liftValue2 f (VLong x) (VLong y) = VLong (f x y)
-  -- liftValue2 f (VFloat x) (VFloat y) = VFloat (f x y)
-  -- liftValue2 f (VDouble x) (VDouble y) = VDouble (f x y)
-
-
   liftVInt :: (Int -> Int) -> Value -> Value
   liftVInt f (VInt x) = VInt (f x)
   liftVInt2 :: (Int -> Int -> Int) -> Value -> Value -> Value
@@ -63,6 +47,9 @@ module VirtualMachine.Types where
   liftVDouble2 :: (Double -> Double -> Double) -> Value -> Value -> Value
   liftVDouble2 f (VDouble x) (VDouble y) = VDouble (f x y)
 
+  -- Wrap Java native primivitve types in Haskell types
+  data Value = VInt Int | VLong Integer| VFloat Float | VDouble Double | VReference Object
+    deriving (Eq, Ord)
 
   instance Num Value where
     (+) (VInt x) (VInt y) = VInt (x + y)

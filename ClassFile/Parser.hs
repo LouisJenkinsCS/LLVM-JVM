@@ -70,9 +70,7 @@ module ClassFile.Parser where
     >> parseConstants >>= \cp -> ClassFile cp <$> getNextShort <*> getNextShort <*> getNextShort
     <*> parseInterfaces <*> parseFields cp <*> parseMethods cp <*> parseAttributes cp
 
-  -- Parses all constants in the Constant Pool. The first 2 bytes contain the size of the
-  -- constant pool. The JVM specification states that the constant pool is indexed from
-  -- [1, cp_count), and so index 0 is filled in with a dummy constant.
+
   parseConstants :: Parser [CP_Info]
   parseConstants = getNextShort >>= \n -> replicateM (fromIntegral n - 1) parseConstant
     >>= \cp -> return $ Dummy_Info : cp
