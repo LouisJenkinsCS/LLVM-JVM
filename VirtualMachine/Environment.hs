@@ -9,7 +9,7 @@ module VirtualMachine.Environment where
   import Data.Maybe
 
   init :: IO Runtime_Environment
-  init = Environment undefined <$> newIORef Map.empty <*> newIORef []
+  init = Environment <$> newIORef undefined <*> newIORef Map.empty <*> newIORef []
 
   loadClass :: Runtime_Environment -> ClassFile -> IO ()
   loadClass env cf = toClass cf >>= \c -> modifyIORef' (class_map env) (Map.insert classString c)
@@ -25,4 +25,4 @@ module VirtualMachine.Environment where
   start :: Runtime_Environment -> IO ()
   start env = putStrLn "Starting..." >> (fromJust . Map.lookup "main") <$> ((snd . head . Map.toList)
     <$> readIORef (class_map env) >>= readIORef . method_map)
-    >>= pushFrame env >> putStrLn "Created stack for main..." >> readIORef (stack env) >>= execute . head
+    >>= pushFrame env >> putStrLn "Created stack for main..." >> execute env

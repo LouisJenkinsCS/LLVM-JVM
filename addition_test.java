@@ -2,10 +2,10 @@
 class AdditionTest
 {
 	public static void main (String[] args) {
-		int x = 1;
-		int y = 5;
-		int z = 2;
-		int w = 4;
+		int x = 100000;
+		int y = 500000;
+		int z = 200000;
+		int w = 400000;
 		int result = x + y * z / w;
 	}
 }
