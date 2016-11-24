@@ -14,7 +14,7 @@ module DataTypes.Class_File where
   main :: IO ()
   main = do
     setLocaleEncoding utf8
-    r0 <- BS.readFile "AdditionTest.class"
+    r0 <- BS.readFile "ConditionalTest.class"
     Prelude.putStrLn $ "Starting Bytes: " ++ show (BS.length r0)
     let classFile = parseClassFile r0
     Prelude.putStrLn $ show classFile

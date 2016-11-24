@@ -1,6 +1,7 @@
 module VirtualMachine.ByteCode where
   import Data.IORef
   import Data.Bits
+  import Data.Word
   import Control.Monad
   import VirtualMachine.Types
   import ClassFile.Types
@@ -45,6 +46,8 @@ module VirtualMachine.ByteCode where
           | bc >= 54 && bc <= 86 = storeOp frame bc
           -- Math
           | bc >= 96 && bc <= 132 = mathOp frame bc
+          -- Conditionals
+          | bc >= 148 && bc <= 166 = cmpOp frame bc
           -- Return
           | bc == 177 = return ()
           | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
@@ -123,9 +126,49 @@ module VirtualMachine.ByteCode where
         increment = getNextBC frame >>= getLocal frame >>= \l -> getNextBC frame
           >>= \n -> pushOp frame (l + fromIntegral n)
 
+  cmpOp :: StackFrame -> ByteCode -> IO ()
+  cmpOp frame bc
+    | bc >= 148 && bc <= 152 = pushCmp
+    | bc >= 153 && bc <= 166 = getNextShort frame >>= \jmp -> when (bc >= 159) pushCmp
+      >> cmpJmp jmp
+    | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
+    where
+      pushCmp :: IO ()
+      pushCmp = (compare <$> popOp frame <*> popOp frame) >>= pushOrd
+      pushOrd :: Ordering -> IO ()
+      pushOrd ord = pushOp frame (VInt (ordToInt ord))
+      cmpJmp :: Word16 -> IO ()
+      cmpJmp
+        | bc == 153 || bc == 159 || bc == 165 = ifEQJmp
+        | bc == 154 || bc == 160 || bc == 166 = ifNEQJmp
+        | bc == 155 || bc == 161 = ifLTJmp
+        | bc == 156 || bc == 162 = ifGTEJmp
+        | bc == 157 || bc == 163 = ifGTJmp
+        | bc == 158 || bc == 164 = ifLTEJmp
+          where
+            ifEQJmp jmp = condJmp jmp EQ
+            ifNEQJmp jmp = condJmp jmp LT >> condJmp jmp GT
+            ifGTJmp jmp = condJmp jmp GT
+            ifLTJmp jmp = condJmp jmp LT
+            ifGTEJmp jmp = condJmp jmp GT >> condJmp jmp EQ
+            ifLTEJmp jmp = condJmp jmp LT >> condJmp jmp EQ
+      condJmp :: Word16 -> Ordering -> IO ()
+      condJmp jmp ord = popOp frame >>= \op -> when (ordToInt ord == op)
+        (readIORef frame >>= \f -> writeIORef (program_counter . code_segment $ f) (fromIntegral jmp))
+      ordToInt ord = case ord of
+        GT -> 1
+        EQ -> 0
+        LT -> -1
+
+
+
+
   getNextBC :: StackFrame -> IO ByteCode
   getNextBC frame = readIORef frame >>= \f -> -- Read StackFrame from passed reference
     let segment = code_segment f in -- Retrieve current set of instructions
     readIORef (program_counter segment) >>= \n -> -- Read current ByteCode instruction
     modifyIORef (program_counter segment) (+1) >> -- Increment PC
     return (byte_code segment !! fromIntegral n) -- Return ByteCode instruction
+
+  getNextShort :: StackFrame -> IO Word16
+  getNextShort frame = replicateM 2 (getNextBC frame) >>= \(i1:i2:_) -> return $ fromIntegral i1 `shift` 8 .|. fromIntegral i2
