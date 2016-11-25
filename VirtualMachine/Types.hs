@@ -3,12 +3,9 @@ module VirtualMachine.Types where
   import Data.IORef
   import Data.Bits
   import Data.Map
-  import Data.Array.IO
   import ClassFile.Types
-  import Control.Monad
   import Text.Printf
-  import Data.STRef
-  import Numeric
+
 
   type Stack = IORef [StackFrame]
 
@@ -24,37 +21,12 @@ module VirtualMachine.Types where
     program_counter :: IORef Word32
   }
 
-  -- Temporary type until a proper heap is setup
+  -- Placeholder for an Object type until a proper heap is established
   type Object = Int
 
-  liftVInt :: (Int -> Int) -> Value -> Value
-  liftVInt f (VInt x) = VInt (f x)
-  liftVInt2 :: (Int -> Int -> Int) -> Value -> Value -> Value
-  liftVInt2 f (VInt x) (VInt y) = VInt (f x y)
-
-  liftVLong :: (Integer -> Integer) -> Value -> Value
-  liftVLong f (VLong x) = VLong (f x)
-  liftVLong2 :: (Integer -> Integer -> Integer) -> Value -> Value -> Value
-  liftVLong2 f (VLong x) (VLong y) = VLong (f x y)
-
-  liftVFloat :: (Float -> Float) -> Value -> Value
-  liftVFloat f (VFloat x) = VFloat (f x)
-  liftVFloat2 :: (Float -> Float -> Float) -> Value -> Value -> Value
-  liftVFloat2 f (VFloat x) (VFloat y) = VFloat (f x y)
-
-  liftVDouble :: (Double -> Double) -> Value -> Value
-  liftVDouble f (VDouble x) = VDouble (f x)
-  liftVDouble2 :: (Double -> Double -> Double) -> Value -> Value -> Value
-  liftVDouble2 f (VDouble x) (VDouble y) = VDouble (f x y)
-
-  liftVString :: (String -> String) -> Value -> Value
-  liftVString f (VString x) = VString (f x)
-  liftVString2 :: (String -> String -> String) -> Value -> Value -> Value
-  liftVString2 f (VString x) (VString y) = VString (f x y)
-
   -- Wrap Java native primivitve types in Haskell types
-  data Value = VInt Int | VLong Integer| VFloat Float | VDouble Double | VReference Object | VString String
-    deriving (Eq, Ord)
+  data Value = VInt Int | VLong Integer| VFloat Float | VDouble Double
+    | VReference Object | VString String deriving (Eq, Ord)
 
   instance Num Value where
     (+) (VInt x) (VInt y) = VInt (x + y)
@@ -120,27 +92,30 @@ module VirtualMachine.Types where
     xor (VInt x) (VInt y) = VInt (x `xor` y)
     xor _ _ = error "Bad Op: xor"
 
+
   type Local_Variable = IORef Value
 
   type Operand = Value
 
+  {- Runtime representation of a method -}
   data Method = Method {
     method_code :: Instructions,
     method_locals :: Word16
   }
 
+  {- Runtime representation of a field -}
   data Field = Field {
     field_value :: Value
   }
 
+  {- Runtime representation of a Class -}
   data Class = Class {
     constant_pool :: [CP_Info],
     method_map :: IORef (Map String Method),
     field_map :: IORef (Map String Field)
   }
 
-  type Bitmap = [Word8]
-
+  {- Representation of a runtime environment -}
   data Runtime_Environment = Environment {
     current_class :: IORef Class,
     class_map :: IORef (Map String Class),
@@ -148,19 +123,7 @@ module VirtualMachine.Types where
     debug_mode :: Bool
   }
 
-  -- newtype Runtime = Runtime { runRT :: Runtime_Environment -> IO () }
-  --
-  -- execRT :: Runtime -> Runtime_Environment -> IO ()
-  -- execRT = undefined
-  --
-  -- instance Functor Runtime where
-  --   fmap f rt = Runtime $ execRT rt >=> pure . f
-  --
-  -- instance Monad Runtime where
-  --   rt >>= f = Runtime $ \env -> runRT rt env >> f
-
-
-
+  {- Representation of a stack frame. -}
   data Stack_Frame = Frame {
     local_variables :: [Local_Variable],
     operand_stack :: IORef [Operand],

@@ -6,21 +6,14 @@ module VirtualMachine.Stack where
   import VirtualMachine.Stack_Frame
   import VirtualMachine.ByteCode
 
+  {- Obtains the current stack frame -}
   getCurrentFrame :: Runtime_Environment -> IO StackFrame
   getCurrentFrame env = head <$> readIORef (stack env)
 
-  {-
-    Pops the current frame off of the stack. No epilogues, such as garbage collection,
-    have been implemented yet.
-  -}
+  {- Pops the current stack frame off of the stack -}
   popFrame :: Runtime_Environment -> IO ()
   popFrame env = modifyIORef' (stack env) tail
 
-  {-
-    Creates a stack frame with the request number of Local Variables and the
-    executable bytecode instructions. The number of Local Variables are static and must
-    support random-access, but the Operand Stack is best implemented as a mutable
-    reference.
-  -}
+  {- Create a frame for the passed method and pushes on stack -}
   pushFrame :: Runtime_Environment -> Method -> IO ()
   pushFrame env meth = createFrame meth >>= \f -> modifyIORef (stack env) ((:) f)

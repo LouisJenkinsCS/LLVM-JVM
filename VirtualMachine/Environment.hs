@@ -17,8 +17,9 @@ module VirtualMachine.Environment where
 
   {- Minimal bootstrap class loader -}
   loadClass :: Runtime_Environment -> ClassFile -> IO ()
-  loadClass env cf = toClass cf >>= \c -> modifyIORef' (class_map env) (Map.insert classString c)
-    >> writeIORef (current_class env) c
+  loadClass env cf =
+    toClass cf >>= \c -> modifyIORef' (class_map env) (Map.insert classString c)
+      >> writeIORef (current_class env) c
       where
         classString :: String
         classString = let
@@ -29,6 +30,7 @@ module VirtualMachine.Environment where
 
   {- Primer for the runtime, which sets up and executes the 'main' method -}
   start :: Runtime_Environment -> IO ()
-  start env = putStrLn "Starting..." >> (fromJust . Map.lookup "main") <$> ((snd . head . Map.toList)
-    <$> readIORef (class_map env) >>= readIORef . method_map)
-    >>= pushFrame env >> putStrLn "Created stack for main..." >> execute env
+  start env = (fromJust . Map.lookup "main") <$> -- Look for "main" function (result is a pair)
+    ((snd . head . Map.toList) <$> -- Take the first (only) result and the second of pair (class)
+    readIORef (class_map env) >>= readIORef . method_map) -- Obtain method_map of result class
+    >>= pushFrame env >> execute env -- Create frame for main and begin execution

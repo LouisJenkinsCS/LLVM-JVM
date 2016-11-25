@@ -32,33 +32,34 @@ module VirtualMachine.Stack_Frame where
               | n > 0 = (:) <$> newIORef (VReference 0) <*> createLocals (n - 1)
               | otherwise = error $ "Error while attempting to create locals: n=" ++ show n
 
+  {- Obtain the reference to the PC of this stack frame -}
   getPC :: StackFrame -> IO (IORef Word32)
   getPC frame = program_counter . code_segment <$> readIORef frame
 
+  {- Obtain the PC of this stack frame -}
   getPC' :: Integral a => StackFrame -> IO a
   getPC' frame = getPC frame >>= \f -> fromIntegral <$> readIORef f
 
+  {- Set the PC of this stack frame -}
   setPC :: Integral a => StackFrame -> a -> IO ()
   setPC frame pc = getPC frame >>= flip writeIORef (fromIntegral pc)
 
+  {- Mutate the PC of this stack frame -}
   modifyPC :: Integral a => StackFrame -> (a -> a) -> IO ()
   modifyPC frame f = (f <$> getPC' frame) >>= setPC frame
 
+  {- Maximum PC for this stack frame (without going out of bounds) -}
   maxPC :: Integral a => StackFrame -> IO a
   maxPC frame = fromIntegral . length <$> getInstructions frame
 
   getInstructions :: StackFrame -> IO Instructions
   getInstructions frame = byte_code . code_segment <$> readIORef frame
 
-  {-
-    Pushes a value on the operand stack
-  -}
+  {- Pushes a value on the operand stack -}
   pushOp :: StackFrame -> Value -> IO ()
   pushOp frame val = (operand_stack <$> readIORef frame) >>= flip modifyIORef (val :)
 
-  {-
-    Pops the operand off of the stack
-  -}
+  {- Pops the operand off of the stack -}
   popOp :: StackFrame -> IO Value
   popOp frame = readIORef frame >>= \f -> readIORef (operand_stack f)
     >>= \ops -> writeIORef (operand_stack f) (tail ops) >> return (head ops)
@@ -72,17 +73,10 @@ module VirtualMachine.Stack_Frame where
   modifyLocal :: (Integral a) => StackFrame -> a -> (Value -> Value) -> IO ()
   modifyLocal frame idx f = getLocal frame idx >>= flip modifyIORef f
 
-  {-
-    Returns the value associated the given index.
-  -}
+  {- Returns the value of the local variable. -}
   getLocal' :: (Integral a) => StackFrame -> a -> IO Value
   getLocal' frame idx = readIORef frame >>= \f -> readIORef (local_variables f !! fromIntegral idx)
 
+  {- Returns a reference to the local variable -}
   getLocal :: Integral a => StackFrame -> a -> IO (IORef Value)
   getLocal frame idx = (!! fromIntegral idx) . local_variables <$> readIORef frame
-
-  {-
-    Pops off N operands off of the stack
-  -}
-  popOpN :: Word8 -> StackFrame -> IO [Operand]
-  popOpN n frameRef = replicateM (fromEnum n) (popOp frameRef)

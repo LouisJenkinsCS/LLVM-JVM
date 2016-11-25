@@ -1,0 +1,219 @@
+Classfile /C:/github/Minimal-JVM/Examples/ArithmeticTest.class
+  Last modified Nov 25, 2016; size 1024 bytes
+  MD5 checksum ae75022a34c1b7c7aaa8f57199158159
+  Compiled from "ArithmeticTest.java"
+class ArithmeticTest
+  minor version: 0
+  major version: 52
+  flags: ACC_SUPER
+Constant pool:
+   #1 = Methodref          #18.#27        // java/lang/Object."<init>":()V
+   #2 = Fieldref           #28.#29        // java/lang/System.out:Ljava/io/PrintStream;
+   #3 = Class              #30            // java/lang/StringBuilder
+   #4 = Methodref          #3.#27         // java/lang/StringBuilder."<init>":()V
+   #5 = String             #31            // X =
+   #6 = Methodref          #3.#32         // java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+   #7 = Methodref          #3.#33         // java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+   #8 = Methodref          #3.#34         // java/lang/StringBuilder.toString:()Ljava/lang/String;
+   #9 = Methodref          #35.#36        // java/io/PrintStream.println:(Ljava/lang/String;)V
+  #10 = String             #37            // Y =
+  #11 = String             #38            // Z =
+  #12 = String             #39            // X + Y + Z =
+  #13 = String             #40            // X - Y = Z =
+  #14 = String             #41            // X * Y * Z =
+  #15 = String             #42            // X / Y / Z =
+  #16 = String             #43            // X + Y / Z =
+  #17 = Class              #44            // ArithmeticTest
+  #18 = Class              #45            // java/lang/Object
+  #19 = Utf8               <init>
+  #20 = Utf8               ()V
+  #21 = Utf8               Code
+  #22 = Utf8               LineNumberTable
+  #23 = Utf8               main
+  #24 = Utf8               ([Ljava/lang/String;)V
+  #25 = Utf8               SourceFile
+  #26 = Utf8               ArithmeticTest.java
+  #27 = NameAndType        #19:#20        // "<init>":()V
+  #28 = Class              #46            // java/lang/System
+  #29 = NameAndType        #47:#48        // out:Ljava/io/PrintStream;
+  #30 = Utf8               java/lang/StringBuilder
+  #31 = Utf8               X =
+  #32 = NameAndType        #49:#50        // append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+  #33 = NameAndType        #49:#51        // append:(I)Ljava/lang/StringBuilder;
+  #34 = NameAndType        #52:#53        // toString:()Ljava/lang/String;
+  #35 = Class              #54            // java/io/PrintStream
+  #36 = NameAndType        #55:#56        // println:(Ljava/lang/String;)V
+  #37 = Utf8               Y =
+  #38 = Utf8               Z =
+  #39 = Utf8               X + Y + Z =
+  #40 = Utf8               X - Y = Z =
+  #41 = Utf8               X * Y * Z =
+  #42 = Utf8               X / Y / Z =
+  #43 = Utf8               X + Y / Z =
+  #44 = Utf8               ArithmeticTest
+  #45 = Utf8               java/lang/Object
+  #46 = Utf8               java/lang/System
+  #47 = Utf8               out
+  #48 = Utf8               Ljava/io/PrintStream;
+  #49 = Utf8               append
+  #50 = Utf8               (Ljava/lang/String;)Ljava/lang/StringBuilder;
+  #51 = Utf8               (I)Ljava/lang/StringBuilder;
+  #52 = Utf8               toString
+  #53 = Utf8               ()Ljava/lang/String;
+  #54 = Utf8               java/io/PrintStream
+  #55 = Utf8               println
+  #56 = Utf8               (Ljava/lang/String;)V
+{
+  ArithmeticTest();
+    descriptor: ()V
+    flags:
+    Code:
+      stack=1, locals=1, args_size=1
+         0: aload_0
+         1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+         4: return
+      LineNumberTable:
+        line 2: 0
+
+  public static void main(java.lang.String[]);
+    descriptor: ([Ljava/lang/String;)V
+    flags: ACC_PUBLIC, ACC_STATIC
+    Code:
+      stack=3, locals=9, args_size=1
+         0: bipush        100
+         2: istore_1
+         3: getstatic     #2                  // Field java/lang/System.out:Ljava/io/PrintStream;
+         6: new           #3                  // class java/lang/StringBuilder
+         9: dup
+        10: invokespecial #4                  // Method java/lang/StringBuilder."<init>":()V
+        13: ldc           #5                  // String X =
+        15: invokevirtual #6                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+        18: iload_1
+        19: invokevirtual #7                  // Method java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+        22: invokevirtual #8                  // Method java/lang/StringBuilder.toString:()Ljava/lang/String;
+        25: invokevirtual #9                  // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+        28: sipush        1000
+        31: istore_2
+        32: getstatic     #2                  // Field java/lang/System.out:Ljava/io/PrintStream;
+        35: new           #3                  // class java/lang/StringBuilder
+        38: dup
+        39: invokespecial #4                  // Method java/lang/StringBuilder."<init>":()V
+        42: ldc           #10                 // String Y =
+        44: invokevirtual #6                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+        47: iload_2
+        48: invokevirtual #7                  // Method java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+        51: invokevirtual #8                  // Method java/lang/StringBuilder.toString:()Ljava/lang/String;
+        54: invokevirtual #9                  // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+        57: bipush        50
+        59: istore_3
+        60: getstatic     #2                  // Field java/lang/System.out:Ljava/io/PrintStream;
+        63: new           #3                  // class java/lang/StringBuilder
+        66: dup
+        67: invokespecial #4                  // Method java/lang/StringBuilder."<init>":()V
+        70: ldc           #11                 // String Z =
+        72: invokevirtual #6                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+        75: iload_3
+        76: invokevirtual #7                  // Method java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+        79: invokevirtual #8                  // Method java/lang/StringBuilder.toString:()Ljava/lang/String;
+        82: invokevirtual #9                  // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+        85: iload_1
+        86: iload_2
+        87: iadd
+        88: iload_3
+        89: iadd
+        90: istore        4
+        92: iload_1
+        93: iload_2
+        94: isub
+        95: iload_3
+        96: isub
+        97: istore        5
+        99: iload_1
+       100: iload_2
+       101: imul
+       102: iload_3
+       103: imul
+       104: istore        6
+       106: iload_1
+       107: iload_2
+       108: idiv
+       109: iload_3
+       110: idiv
+       111: istore        7
+       113: iload_1
+       114: iload_2
+       115: iload_3
+       116: idiv
+       117: iadd
+       118: istore        8
+       120: getstatic     #2                  // Field java/lang/System.out:Ljava/io/PrintStream;
+       123: new           #3                  // class java/lang/StringBuilder
+       126: dup
+       127: invokespecial #4                  // Method java/lang/StringBuilder."<init>":()V
+       130: ldc           #12                 // String X + Y + Z =
+       132: invokevirtual #6                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+       135: iload         4
+       137: invokevirtual #7                  // Method java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+       140: invokevirtual #8                  // Method java/lang/StringBuilder.toString:()Ljava/lang/String;
+       143: invokevirtual #9                  // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+       146: getstatic     #2                  // Field java/lang/System.out:Ljava/io/PrintStream;
+       149: new           #3                  // class java/lang/StringBuilder
+       152: dup
+       153: invokespecial #4                  // Method java/lang/StringBuilder."<init>":()V
+       156: ldc           #13                 // String X - Y = Z =
+       158: invokevirtual #6                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+       161: iload         5
+       163: invokevirtual #7                  // Method java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+       166: invokevirtual #8                  // Method java/lang/StringBuilder.toString:()Ljava/lang/String;
+       169: invokevirtual #9                  // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+       172: getstatic     #2                  // Field java/lang/System.out:Ljava/io/PrintStream;
+       175: new           #3                  // class java/lang/StringBuilder
+       178: dup
+       179: invokespecial #4                  // Method java/lang/StringBuilder."<init>":()V
+       182: ldc           #14                 // String X * Y * Z =
+       184: invokevirtual #6                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+       187: iload         6
+       189: invokevirtual #7                  // Method java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+       192: invokevirtual #8                  // Method java/lang/StringBuilder.toString:()Ljava/lang/String;
+       195: invokevirtual #9                  // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+       198: getstatic     #2                  // Field java/lang/System.out:Ljava/io/PrintStream;
+       201: new           #3                  // class java/lang/StringBuilder
+       204: dup
+       205: invokespecial #4                  // Method java/lang/StringBuilder."<init>":()V
+       208: ldc           #15                 // String X / Y / Z =
+       210: invokevirtual #6                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+       213: iload         7
+       215: invokevirtual #7                  // Method java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+       218: invokevirtual #8                  // Method java/lang/StringBuilder.toString:()Ljava/lang/String;
+       221: invokevirtual #9                  // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+       224: getstatic     #2                  // Field java/lang/System.out:Ljava/io/PrintStream;
+       227: new           #3                  // class java/lang/StringBuilder
+       230: dup
+       231: invokespecial #4                  // Method java/lang/StringBuilder."<init>":()V
+       234: ldc           #16                 // String X + Y / Z =
+       236: invokevirtual #6                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+       239: iload         8
+       241: invokevirtual #7                  // Method java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+       244: invokevirtual #8                  // Method java/lang/StringBuilder.toString:()Ljava/lang/String;
+       247: invokevirtual #9                  // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+       250: return
+      LineNumberTable:
+        line 6: 0
+        line 7: 3
+        line 8: 28
+        line 9: 32
+        line 10: 57
+        line 11: 60
+        line 13: 85
+        line 14: 92
+        line 15: 99
+        line 16: 106
+        line 17: 113
+        line 18: 120
+        line 19: 146
+        line 20: 172
+        line 21: 198
+        line 22: 224
+        line 23: 250
+}
+SourceFile: "ArithmeticTest.java"
