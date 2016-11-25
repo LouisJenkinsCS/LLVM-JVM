@@ -42,7 +42,7 @@ module VirtualMachine.Stack_Frame where
   setPC frame pc = getPC frame >>= flip writeIORef (fromIntegral pc)
 
   modifyPC :: Integral a => StackFrame -> (a -> a) -> IO ()
-  modifyPC frame f = (f <$> getPC' frame) >>= setPC frame >> getPC' frame >>= print
+  modifyPC frame f = (f <$> getPC' frame) >>= setPC frame
 
   maxPC :: Integral a => StackFrame -> IO a
   maxPC frame = fromIntegral . length <$> getInstructions frame
@@ -67,13 +67,19 @@ module VirtualMachine.Stack_Frame where
     Pushes a value as a local variable at the given index.
   -}
   putLocal :: (Integral a) => StackFrame -> a -> Value -> IO ()
-  putLocal frame idx val = readIORef frame >>= \f -> writeIORef (local_variables f !! fromIntegral idx) val
+  putLocal frame idx val = getLocal frame idx >>= flip writeIORef val
+
+  modifyLocal :: (Integral a) => StackFrame -> a -> (Value -> Value) -> IO ()
+  modifyLocal frame idx f = getLocal frame idx >>= flip modifyIORef f
 
   {-
     Returns the value associated the given index.
   -}
-  getLocal :: (Integral a) => StackFrame -> a -> IO Value
-  getLocal frame idx = readIORef frame >>= \f -> readIORef (local_variables f !! fromIntegral idx)
+  getLocal' :: (Integral a) => StackFrame -> a -> IO Value
+  getLocal' frame idx = readIORef frame >>= \f -> readIORef (local_variables f !! fromIntegral idx)
+
+  getLocal :: Integral a => StackFrame -> a -> IO (IORef Value)
+  getLocal frame idx = (!! fromIntegral idx) . local_variables <$> readIORef frame
 
   {-
     Pops off N operands off of the stack

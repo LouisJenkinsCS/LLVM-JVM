@@ -25,7 +25,7 @@ module VirtualMachine.ByteCode where
   execute :: Runtime_Environment -> IO ()
   execute env = head <$> readIORef (stack env)  -- Take the head of the stack (current stack frame)
     >>= \frame -> when (debug_mode env) (debugFrame frame >>= putStrLn) -- Optional Debug
-    >> getPC' frame >>= \pc -> maxPC frame >>= \max_pc ->
+    >> getPC' frame >>= \pc -> maxPC frame >>= \max_pc -> -- Program Counters for comparison
     -- While valid program_counter, execute instruction
     unless (pc >= max_pc) (getNextBC frame >>= execute' frame >> execute env)
       where
@@ -73,15 +73,15 @@ module VirtualMachine.ByteCode where
     -- invokevirtual: (append, println). NOTE: MUST HAVE ONLY ONE PARAMETER ELSE UNDEFINED
     | bc == 182 = getNextShort frame >>= \method_idx -> (readIORef . current_class) env
       >>= \c -> case methodName c method_idx of
-        "append" -> ((\x y -> VString $ show y ++ show x) <$> popOp frame <*> popOp frame)
-          >>= pushOp frame
-        "println" -> popOp frame >>= print
-        "toString" -> return ()
+        "append" -> ((\x y -> VString $ show y ++ show x) <$> popOp frame <*> popOp frame) >>= pushOp frame
+        "println" -> popOp frame >>= print -- Defer I/O to Haskell
+        "toString" -> return () -- StringBuilder object is already a 'VString'
         _ -> error "Bad Method Call!"
-    -- Used to call <init>, but we don't deal with that... yet
+    -- Invokespecial is used to call <init>, but we don't deal with that... yet
     | bc == 183 = void $ getNextShort frame
     -- Laziness: 'new' must refer to StringBuilder... otherwise it's undefined anyway
     | bc == 187 = getNextShort frame >> pushOp frame (VString "")
+    | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
         where
           methodName :: Class -> Word16 -> String
           methodName clazz method_idx = let
@@ -91,35 +91,30 @@ module VirtualMachine.ByteCode where
             utf8_name = cpool !! fromIntegral (name_index name_and_type)
             in show . utf8_bytes $ utf8_name
 
-  {-
-    Loads transfer values from a slot in the Local Variable array to the Operand
-    Stack. Note as well that we can safely ignore the second index for DWORD-sized
-    variables.
-  -}
+  {- Loads from local_variables to operand_stack -}
   loadOp :: StackFrame -> ByteCode -> IO ()
   loadOp frame bc
-    -- Loads which have the index as the next bytecode instruction
-    | bc >= 21 && bc <=25 = getNextBC frame >>= getLocal frame >>= pushOp frame
-    -- Loads which have a constant index (I.E: ILOAD_0 to ILOAD_3)
-    | bc >= 26 && bc <= 45 = getLocal frame ((bc - 26) `mod` 4) >>= pushOp frame
+    -- Loads with the index as the next bytecode instruction
+    | bc >= 21 && bc <=25 = getNextBC frame >>= getLocal' frame >>= pushOp frame
+    -- Loads with a constant index (I.E: ILOAD_0 to ILOAD_3 have indice 0 to 3 respectively)
+    | bc >= 26 && bc <= 45 = getLocal' frame ((bc - 26) `mod` 4) >>= pushOp frame
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
-  {-
-    Stores transfer the top value of the Operand Stack to an indice in the
-    Local Variable array. The JVM specification specifies that for DWORD sized
-    types (I.E: Long and Double) take up two slots in the Local Variable
-    array (the lower index contains the higher WORD, higher index contains the
-    lower WORD), so we store a dummy value (Null reference) in the higher index.
-  -}
+  {- Stores from operand_stack to local_variables -}
   storeOp :: StackFrame -> ByteCode -> IO ()
   storeOp frame bc
-    -- Stores which have the Index as the next bytecode instruction
+    -- Stores with the index as the next bytecode instruction
     | bc >= 54 && bc <= 58 = popOp frame >>= \op -> getNextBC frame >>= \idx -> putLocal frame idx op
       >> when (bc == 55 || bc == 57) (putLocal frame (idx + 1) (VReference 0))
-    -- Stores which have a constant index
-    | bc >= 59 && bc <= 78 = popOp frame >>= putLocal frame ((bc - 59) `mod` 4)
+    -- Stores with a constant index (I.E: ISTORE_0 to ISTORE_3 have indice 0 to 3 respectively)
+    | bc >= 59 && bc <= 78 = let idx = ((bc - 59) `mod` 4) in
+      popOp frame >>= putLocal frame idx
+      -- Special Case: Double word-sized variables, such as 'long' and 'double' must
+      -- take up two slots. We fit both types in a single slot, but the compiler generates
+      -- ByteCode that are sensitive to these invariants, so we insert a dummy null reference
+      -- in the second slot to restore that balance.
       >> when ((bc >= 63 && bc <= 66) || (bc >= 71 && bc <= 74))
-      (putLocal frame (((bc - 59) `mod` 4) + 1) (VReference 0))
+      ((putLocal frame $ idx + 1) (VReference 0))
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
 
@@ -162,7 +157,8 @@ module VirtualMachine.ByteCode where
         applyBinaryOp :: (Operand -> Operand -> Operand) -> IO ()
         applyBinaryOp f = replicateM 2 (popOp frame) >>= \(x:y:_) -> pushOp frame (f y x)
         increment :: IO ()
-        increment = getNextBC frame >>= \idx -> getLocal frame idx >>= \l -> getNextBC frame >>= \n -> putLocal frame idx (l + fromIntegral n)
+        increment = -- 'iinc' has local variable index as first, with value as second indice
+          join $ modifyLocal frame <$> getNextBC frame <*> ((+) . fromIntegral <$> getNextBC frame)
 
   cmpOp :: StackFrame -> ByteCode -> IO ()
   cmpOp frame bc
