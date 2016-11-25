@@ -14,6 +14,7 @@ module VirtualMachine.ByteCode where
     where
       toValue :: CP_Info -> IO Value
       toValue info = return $ case tag info of
+        1 -> VString . show . utf8_bytes $ info
         3 -> VInt . fromIntegral . bytes $ info
         4 -> VFloat . wordToFloat . bytes $ info
         5 -> VLong (fromIntegral . high_bytes $ info) `shift` 32  .|. (fromIntegral . low_bytes $ info)
@@ -54,7 +55,30 @@ module VirtualMachine.ByteCode where
             >>= \pc -> getNextShort frame >>= \n -> readIORef frame >>= flip (writeIORef . program_counter . code_segment) (fromIntegral (fromIntegral pc + n - 1))
           -- Return
           | bc == 177 = return ()
+          -- Runtime Stubs
+          | bc >= 178 || bc <= 195 = runtimeStub env frame bc
           | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
+
+  runtimeStub :: Runtime_Environment -> StackFrame -> ByteCode -> IO ()
+  runtimeStub env frame bc
+    -- getstatic: 2 bytes wide
+    | bc == 178 = replicateM_ 2 (getNextBC frame)
+    -- invokevirtual: (append, println). NOTE: MUST HAVE ONLY ONE PARAMETER ELSE UNDEFINED
+    | bc == 182 = getNextShort frame >>= \method_idx -> (readIORef . current_class) env
+      >>= \c -> case methodName c method_idx of
+        "append" -> (appendValues <$> popOp frame <*> popOp frame) >>= pushOp frame
+          where
+            appendValues x y = VString $ show x ++ show y
+        "println" -> popOp frame >>= print
+        _ -> error "Bad Method Call!"
+        where
+          methodName :: Class -> Word16 -> String
+          methodName clazz method_idx = let
+            cpool = constant_pool clazz
+            method_ref = cpool !! fromIntegral method_idx
+            name_and_type = cpool !! fromIntegral (name_and_type_index method_ref)
+            utf8_name = cpool !! fromIntegral (name_index name_and_type)
+            in show . utf8_bytes $ utf8_name
 
   {-
     Loads transfer values from a slot in the Local Variable array to the Operand

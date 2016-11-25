@@ -47,8 +47,13 @@ module VirtualMachine.Types where
   liftVDouble2 :: (Double -> Double -> Double) -> Value -> Value -> Value
   liftVDouble2 f (VDouble x) (VDouble y) = VDouble (f x y)
 
+  liftVString :: (String -> String) -> Value -> Value
+  liftVString f (VString x) = VString (f x)
+  liftVString2 :: (String -> String -> String) -> Value -> Value -> Value
+  liftVString2 f (VString x) (VString y) = VString (f x y)
+
   -- Wrap Java native primivitve types in Haskell types
-  data Value = VInt Int | VLong Integer| VFloat Float | VDouble Double | VReference Object
+  data Value = VInt Int | VLong Integer| VFloat Float | VDouble Double | VReference Object | VString String
     deriving (Eq, Ord)
 
   instance Num Value where
@@ -100,6 +105,7 @@ module VirtualMachine.Types where
     show (VFloat x) = show x
     show (VDouble x) = show x
     show (VReference x) = printf "0x%X" x
+    show (VString x) = x
 
   instance Bits Value where
     shift (VInt x) = VInt . shift x
