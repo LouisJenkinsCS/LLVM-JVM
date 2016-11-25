@@ -144,7 +144,8 @@ module VirtualMachine.Types where
   data Runtime_Environment = Environment {
     current_class :: IORef Class,
     class_map :: IORef (Map String Class),
-    stack :: Stack
+    stack :: Stack,
+    debug_mode :: Bool
   }
 
   -- newtype Runtime = Runtime { runRT :: Runtime_Environment -> IO () }

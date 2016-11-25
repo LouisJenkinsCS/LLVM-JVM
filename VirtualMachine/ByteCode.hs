@@ -13,39 +13,45 @@ module VirtualMachine.ByteCode where
   loadConstantPool env idx = (!! idx) . constant_pool <$> readIORef (current_class env) >>= toValue
     where
       toValue :: CP_Info -> IO Value
-      toValue info = return $ case tag info of
-        1 -> VString . show . utf8_bytes $ info
-        3 -> VInt . fromIntegral . bytes $ info
-        4 -> VFloat . wordToFloat . bytes $ info
-        5 -> VLong (fromIntegral . high_bytes $ info) `shift` 32  .|. (fromIntegral . low_bytes $ info)
-        6 -> VDouble . wordToDouble $ (fromIntegral . high_bytes $ info) `shift` 32  .|. (fromIntegral . low_bytes $ info)
+      toValue info = case tag info of
+        3 -> return . VInt . fromIntegral . bytes $ info
+        4 -> return . VFloat . wordToFloat . bytes $ info
+        5 -> return . VLong $ (fromIntegral . high_bytes $ info) `shift` 32  .|. (fromIntegral . low_bytes $ info)
+        6 -> return . VDouble . wordToDouble $ (fromIntegral . high_bytes $ info) `shift` 32  .|. (fromIntegral . low_bytes $ info)
+        8 -> readIORef (current_class env) >>= \c -> (return . VString . show . utf8_bytes) (constant_pool c !! (fromIntegral . string_index $ info))
         _ -> error $ "Bad Tag: " ++ show (tag info)
 
+  {- Starting point of execution of ByteCode isntructions -}
   execute :: Runtime_Environment -> IO ()
-  execute env = head <$> readIORef (stack env) >>= \frame -> debugFrame frame >>= putStrLn
+  execute env = head <$> readIORef (stack env)  -- Take the head of the stack (current stack frame)
+    >>= \frame -> when (debug_mode env) (debugFrame frame >>= putStrLn) -- Optional Debug
     >> readIORef frame >>= \f -> readIORef (program_counter . code_segment $ f) >>= \pc ->
-    unless (fromIntegral pc >= length (byte_code . code_segment $ f)) $ getNextBC frame
-    >>= execute' frame >> execute env
+    unless (fromIntegral pc >= length (byte_code . code_segment $ f)) -- While valid program_counter
+    (getNextBC frame >>= execute' frame >> execute env) -- Execute instruction
       where
+        -- The main dispatcher logic
         execute' :: StackFrame -> ByteCode -> IO ()
         execute' frame bc
           -- NOP
           | bc == 0 = return ()
           -- Constants
           | bc >= 1 && bc <= 15 = constOp frame bc
-          -- BIPUSH BYTE
-          | bc == 16 = getNextBC frame >>= pushOp frame . fromIntegral
-          -- SIPUSH BYTE1 BYTE2
-          | bc == 17 = replicateM 2 (getNextBC frame) >>= \(b1:b2:_) -> pushOp frame (fromIntegral b1 `shift` 8 .|. fromIntegral b2)
-          -- LDC IDX
-          | bc == 18 = getNextBC frame >>= loadConstantPool env . fromIntegral >>= pushOp frame
-          -- LDC2* IDX1 IDX2
-          | bc == 19 || bc == 20 = replicateM 2 (getNextBC frame) >>= \(i1:i2:_) ->
-            loadConstantPool env  (fromIntegral i1 `shift` 8 .|. fromIntegral i2) >>= pushOp frame
+          -- Push raw byte(s)
+          | bc == 16 || bc == 17 =
+            -- 0x10 pushes a single byte, but 0x11 pushes a short
+            (if bc == 16 then fromIntegral <$> getNextBC frame else getNextShort frame)
+              >>= pushOp frame . fromIntegral
+          -- Load constant pool constant
+          | bc >= 18 && bc <= 20 =
+            -- Only 0x12 uses only one byte, so we add a special case
+            (if bc == 18 then fromIntegral <$> getNextBC frame else getNextShort frame)
+              >>= loadConstantPool env . fromIntegral >>= pushOp frame
           -- Loads
           | bc >= 21 && bc <= 53 = loadOp frame bc
           -- Stores
           | bc >= 54 && bc <= 86 = storeOp frame bc
+          -- Special Case: 'dup' is used commonly but ignored, so we have to stub it
+          | bc == 89 = return ()
           -- Math
           | bc >= 96 && bc <= 132 = mathOp frame bc
           -- Conditionals
@@ -62,15 +68,19 @@ module VirtualMachine.ByteCode where
   runtimeStub :: Runtime_Environment -> StackFrame -> ByteCode -> IO ()
   runtimeStub env frame bc
     -- getstatic: 2 bytes wide
-    | bc == 178 = replicateM_ 2 (getNextBC frame)
+    | bc == 178 = void $ getNextShort frame
     -- invokevirtual: (append, println). NOTE: MUST HAVE ONLY ONE PARAMETER ELSE UNDEFINED
     | bc == 182 = getNextShort frame >>= \method_idx -> (readIORef . current_class) env
       >>= \c -> case methodName c method_idx of
-        "append" -> (appendValues <$> popOp frame <*> popOp frame) >>= pushOp frame
-          where
-            appendValues x y = VString $ show x ++ show y
+        "append" -> ((\x y -> VString $ show y ++ show x) <$> popOp frame <*> popOp frame)
+          >>= pushOp frame
         "println" -> popOp frame >>= print
+        "toString" -> return ()
         _ -> error "Bad Method Call!"
+    -- Used to call <init>, but we don't deal with that... yet
+    | bc == 183 = void $ getNextShort frame
+    -- Laziness: 'new' must refer to StringBuilder... otherwise it's undefined anyway
+    | bc == 187 = getNextShort frame >> pushOp frame (VString "")
         where
           methodName :: Class -> Word16 -> String
           methodName clazz method_idx = let
@@ -163,7 +173,7 @@ module VirtualMachine.ByteCode where
       pushCmp :: IO ()
       pushCmp = (flip compare <$> popOp frame <*> popOp frame) >>= pushOrd
       pushOrd :: Ordering -> IO ()
-      pushOrd ord = pushOp frame (VInt (ordToInt ord)) >> debugFrame frame >>= putStrLn
+      pushOrd ord = pushOp frame (VInt (ordToInt ord))
       cmpJmp :: Word16 -> IO ()
       cmpJmp
         | bc == 153 || bc == 159 || bc == 165 = flip condJmp [EQ]

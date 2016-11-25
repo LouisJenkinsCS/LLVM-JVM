@@ -19,7 +19,7 @@ module DataTypes.Class_File where
     let classFile = parseClassFile r0
     Prelude.putStrLn $ show classFile
     Prelude.putStrLn "Initializing Runtime Environment..."
-    env <- VirtualMachine.Environment.init
+    env <- VirtualMachine.Environment.init False
     Prelude.putStrLn "Loading bootstrap class..."
     loadClass env classFile
     Prelude.putStrLn "Starting Virtual Machine..."
