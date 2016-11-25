@@ -97,25 +97,25 @@ module VirtualMachine.Types where
 
   type Operand = Value
 
-  {- Runtime representation of a method -}
+  {- | Runtime representation of a method -}
   data Method = Method {
     method_code :: Instructions,
     method_locals :: Word16
   }
 
-  {- Runtime representation of a field -}
+  {- | Runtime representation of a field -}
   data Field = Field {
     field_value :: Value
   }
 
-  {- Runtime representation of a Class -}
+  {- | Runtime representation of a Class -}
   data Class = Class {
     constant_pool :: [CP_Info],
     method_map :: IORef (Map String Method),
     field_map :: IORef (Map String Field)
   }
 
-  {- Representation of a runtime environment -}
+  {- | Representation of a runtime environment -}
   data Runtime_Environment = Environment {
     current_class :: IORef Class,
     class_map :: IORef (Map String Class),
@@ -123,7 +123,7 @@ module VirtualMachine.Types where
     debug_mode :: Bool
   }
 
-  {- Representation of a stack frame. -}
+  {- | Representation of a stack frame. -}
   data Stack_Frame = Frame {
     local_variables :: [Local_Variable],
     operand_stack :: IORef [Operand],

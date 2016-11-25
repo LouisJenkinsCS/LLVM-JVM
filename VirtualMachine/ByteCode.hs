@@ -21,7 +21,7 @@ module VirtualMachine.ByteCode where
         8 -> readIORef (current_class env) >>= \c -> (return . VString . show . utf8_bytes) (constant_pool c !! (fromIntegral . string_index $ info))
         _ -> error $ "Bad Tag: " ++ show (tag info)
 
-  {- Starting point of execution of ByteCode isntructions -}
+  {- | Starting point of execution of ByteCode isntructions -}
   execute :: Runtime_Environment -> IO ()
   execute env = head <$> readIORef (stack env)  -- Take the head of the stack (current stack frame)
     >>= \frame -> when (debug_mode env) (debugFrame frame >>= putStrLn) -- Optional Debug
@@ -91,7 +91,7 @@ module VirtualMachine.ByteCode where
             utf8_name = cpool !! fromIntegral (name_index name_and_type)
             in show . utf8_bytes $ utf8_name
 
-  {- Loads from local_variables to operand_stack -}
+  {- | Loads from local_variables to operand_stack -}
   loadOp :: StackFrame -> ByteCode -> IO ()
   loadOp frame bc
     -- Loads with the index as the next bytecode instruction
@@ -100,7 +100,7 @@ module VirtualMachine.ByteCode where
     | bc >= 26 && bc <= 45 = getLocal' frame ((bc - 26) `mod` 4) >>= pushOp frame
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
-  {- Stores from operand_stack to local_variables -}
+  {- | Stores from operand_stack to local_variables -}
   storeOp :: StackFrame -> ByteCode -> IO ()
   storeOp frame bc
     -- Stores with the index as the next bytecode instruction
@@ -118,7 +118,7 @@ module VirtualMachine.ByteCode where
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
 
-  {- Stores constant values on the Operand Stack. -}
+  {- | Stores constant values on the Operand Stack. -}
   constOp :: StackFrame -> ByteCode -> IO ()
   constOp frame bc
     -- Null Reference
@@ -134,7 +134,7 @@ module VirtualMachine.ByteCode where
     -- ERROR
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
 
-  {- Math operations which are abstracted by the Value type. -}
+  {- | Math operations which are abstracted by the Value type. -}
   mathOp :: StackFrame -> ByteCode -> IO ()
   mathOp frame bc
     | bc >= 96 && bc <= 99 = applyBinaryOp (+)
@@ -160,7 +160,7 @@ module VirtualMachine.ByteCode where
         increment = -- 'iinc' has local variable index as first, with value as second indice
           join $ modifyLocal frame <$> getNextBC frame <*> ((+) . fromIntegral <$> getNextBC frame)
 
-  {- Conditional jump instructions ('if', 'for', and 'while') -}
+  {- | Conditional jump instructions ('if', 'for', and 'while') -}
   cmpOp :: StackFrame -> ByteCode -> IO ()
   cmpOp frame bc
     | bc >= 148 && bc <= 152 = pushCmp
@@ -199,7 +199,7 @@ module VirtualMachine.ByteCode where
         -1 -> LT
         _ -> error "Bad Enumerable Value! "
 
-  {- Obtains the next ByteCode instruction and increments the PC -}
+  {- | Obtains the next ByteCode instruction and increments the PC -}
   getNextBC :: StackFrame -> IO ByteCode
   getNextBC frame = readIORef frame >>= \f -> -- Read StackFrame from passed reference
     let segment = code_segment f in -- Retrieve current set of instructions
@@ -207,7 +207,7 @@ module VirtualMachine.ByteCode where
     modifyIORef (program_counter segment) (+1) >> -- Increment PC
     return (byte_code segment !! fromIntegral n) -- Return ByteCode instruction
 
-  {- Obtains the next two ByteCode instructions as a short, and increments the PC by 2 -}
+  {- | Obtains the next two ByteCode instructions as a short, and increments the PC by 2 -}
   getNextShort :: StackFrame -> IO Word16
   getNextShort frame = replicateM 2 (getNextBC frame) >>= \(i1:i2:_) ->
     return $ fromIntegral i1 `shift` 8 .|. fromIntegral i2
