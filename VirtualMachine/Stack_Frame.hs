@@ -32,6 +32,24 @@ module VirtualMachine.Stack_Frame where
               | n > 0 = (:) <$> newIORef (VReference 0) <*> createLocals (n - 1)
               | otherwise = error $ "Error while attempting to create locals: n=" ++ show n
 
+  getPC :: StackFrame -> IO (IORef Word32)
+  getPC frame = program_counter . code_segment <$> readIORef frame
+
+  getPC' :: Integral a => StackFrame -> IO a
+  getPC' frame = getPC frame >>= \f -> fromIntegral <$> readIORef f
+
+  setPC :: Integral a => StackFrame -> a -> IO ()
+  setPC frame pc = getPC frame >>= flip writeIORef (fromIntegral pc)
+
+  modifyPC :: Integral a => StackFrame -> (a -> a) -> IO ()
+  modifyPC frame f = (f <$> getPC' frame) >>= setPC frame >> getPC' frame >>= print
+
+  maxPC :: Integral a => StackFrame -> IO a
+  maxPC frame = fromIntegral . length <$> getInstructions frame
+
+  getInstructions :: StackFrame -> IO Instructions
+  getInstructions frame = byte_code . code_segment <$> readIORef frame
+
   {-
     Pushes a value on the operand stack
   -}

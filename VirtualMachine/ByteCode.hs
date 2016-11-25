@@ -25,9 +25,9 @@ module VirtualMachine.ByteCode where
   execute :: Runtime_Environment -> IO ()
   execute env = head <$> readIORef (stack env)  -- Take the head of the stack (current stack frame)
     >>= \frame -> when (debug_mode env) (debugFrame frame >>= putStrLn) -- Optional Debug
-    >> readIORef frame >>= \f -> readIORef (program_counter . code_segment $ f) >>= \pc ->
-    unless (fromIntegral pc >= length (byte_code . code_segment $ f)) -- While valid program_counter
-    (getNextBC frame >>= execute' frame >> execute env) -- Execute instruction
+    >> getPC' frame >>= \pc -> maxPC frame >>= \max_pc ->
+    -- While valid program_counter, execute instruction
+    unless (pc >= max_pc) (getNextBC frame >>= execute' frame >> execute env)
       where
         -- The main dispatcher logic
         execute' :: StackFrame -> ByteCode -> IO ()
@@ -38,12 +38,12 @@ module VirtualMachine.ByteCode where
           | bc >= 1 && bc <= 15 = constOp frame bc
           -- Push raw byte(s)
           | bc == 16 || bc == 17 =
-            -- 0x10 pushes a single byte, but 0x11 pushes a short
+            -- Special Case: 0x10 pushes a single byte, but 0x11 pushes a short
             (if bc == 16 then fromIntegral <$> getNextBC frame else getNextShort frame)
               >>= pushOp frame . fromIntegral
-          -- Load constant pool constant
+          -- Load from runtime constant pool
           | bc >= 18 && bc <= 20 =
-            -- Only 0x12 uses only one byte, so we add a special case
+            -- Special Case: 0x12 uses only one byte for index, while 0x13 and 0x14 use two
             (if bc == 18 then fromIntegral <$> getNextBC frame else getNextShort frame)
               >>= loadConstantPool env . fromIntegral >>= pushOp frame
           -- Loads
@@ -56,9 +56,10 @@ module VirtualMachine.ByteCode where
           | bc >= 96 && bc <= 132 = mathOp frame bc
           -- Conditionals
           | bc >= 148 && bc <= 166 = cmpOp frame bc
-          -- Goto
-          | bc == 167 = (program_counter . code_segment <$> readIORef frame) >>= readIORef
-            >>= \pc -> getNextShort frame >>= \n -> readIORef frame >>= flip (writeIORef . program_counter . code_segment) (fromIntegral (fromIntegral pc + n - 1))
+          -- Goto: The address is the offset from the current, with the offset being
+          -- the next two instructions. Since we advance the PC 2 (+1 from reading this
+          -- instruction), we must decrement the count by 3 to correctly obtain the target.
+          | bc == 167 = getNextShort frame >>= \jmp -> modifyPC frame (+ (jmp - 3))
           -- Return
           | bc == 177 = return ()
           -- Runtime Stubs
