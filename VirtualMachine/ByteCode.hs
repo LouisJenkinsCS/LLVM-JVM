@@ -23,7 +23,8 @@ module VirtualMachine.ByteCode where
   execute :: Runtime_Environment -> IO ()
   execute env = head <$> readIORef (stack env) >>= \frame -> debugFrame frame >>= putStrLn
     >> readIORef frame >>= \f -> readIORef (program_counter . code_segment $ f) >>= \pc ->
-    unless (fromIntegral pc >= length (byte_code . code_segment $ f)) $ getNextBC frame >>= execute' frame >> execute env
+    unless (fromIntegral pc >= length (byte_code . code_segment $ f)) $ getNextBC frame
+    >>= execute' frame >> execute env
       where
         execute' :: StackFrame -> ByteCode -> IO ()
         execute' frame bc
@@ -48,6 +49,9 @@ module VirtualMachine.ByteCode where
           | bc >= 96 && bc <= 132 = mathOp frame bc
           -- Conditionals
           | bc >= 148 && bc <= 166 = cmpOp frame bc
+          -- Goto
+          | bc == 167 = (program_counter . code_segment <$> readIORef frame) >>= readIORef
+            >>= \pc -> getNextShort frame >>= \n -> readIORef frame >>= flip (writeIORef . program_counter . code_segment) (fromIntegral (fromIntegral pc + n - 1))
           -- Return
           | bc == 177 = return ()
           | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
@@ -111,7 +115,7 @@ module VirtualMachine.ByteCode where
     | bc >= 116 && bc <= 119 = applyUnaryOp negate
     -- Need to implement as lambda due to shiftL and shiftR requiring type Int
     | bc == 120 || bc == 121 = applyBinaryOp (\x y -> x `shiftL` fromIntegral y)
-    | bc >= 122 || bc <= 125 = applyBinaryOp (\x y -> x `shiftR` fromIntegral y)
+    | bc >= 122 && bc <= 125 = applyBinaryOp (\x y -> x `shiftR` fromIntegral y)
     | bc == 126 || bc == 127 = applyBinaryOp (.&.)
     | bc == 128 || bc == 129 = applyBinaryOp (.|.)
     | bc == 130 || bc == 131 = applyBinaryOp xor
@@ -123,42 +127,38 @@ module VirtualMachine.ByteCode where
         applyBinaryOp :: (Operand -> Operand -> Operand) -> IO ()
         applyBinaryOp f = replicateM 2 (popOp frame) >>= \(x:y:_) -> pushOp frame (f y x)
         increment :: IO ()
-        increment = getNextBC frame >>= getLocal frame >>= \l -> getNextBC frame
-          >>= \n -> pushOp frame (l + fromIntegral n)
+        increment = getNextBC frame >>= \idx -> getLocal frame idx >>= \l -> getNextBC frame >>= \n -> putLocal frame idx (l + fromIntegral n)
 
   cmpOp :: StackFrame -> ByteCode -> IO ()
   cmpOp frame bc
     | bc >= 148 && bc <= 152 = pushCmp
-    | bc >= 153 && bc <= 166 = getNextShort frame >>= \jmp -> when (bc >= 159) pushCmp
-      >> cmpJmp jmp
+    | bc >= 153 && bc <= 166 = (program_counter . code_segment <$> readIORef frame) >>= readIORef
+      >>= \pc -> getNextShort frame >>= \jmp -> when (bc >= 159) pushCmp >> cmpJmp (fromIntegral pc + jmp - 1)
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
     where
       pushCmp :: IO ()
-      pushCmp = (compare <$> popOp frame <*> popOp frame) >>= pushOrd
+      pushCmp = (flip compare <$> popOp frame <*> popOp frame) >>= pushOrd
       pushOrd :: Ordering -> IO ()
-      pushOrd ord = pushOp frame (VInt (ordToInt ord))
+      pushOrd ord = pushOp frame (VInt (ordToInt ord)) >> debugFrame frame >>= putStrLn
       cmpJmp :: Word16 -> IO ()
       cmpJmp
-        | bc == 153 || bc == 159 || bc == 165 = ifEQJmp
-        | bc == 154 || bc == 160 || bc == 166 = ifNEQJmp
-        | bc == 155 || bc == 161 = ifLTJmp
-        | bc == 156 || bc == 162 = ifGTEJmp
-        | bc == 157 || bc == 163 = ifGTJmp
-        | bc == 158 || bc == 164 = ifLTEJmp
-          where
-            ifEQJmp jmp = condJmp jmp EQ
-            ifNEQJmp jmp = condJmp jmp LT >> condJmp jmp GT
-            ifGTJmp jmp = condJmp jmp GT
-            ifLTJmp jmp = condJmp jmp LT
-            ifGTEJmp jmp = condJmp jmp GT >> condJmp jmp EQ
-            ifLTEJmp jmp = condJmp jmp LT >> condJmp jmp EQ
-      condJmp :: Word16 -> Ordering -> IO ()
-      condJmp jmp ord = popOp frame >>= \op -> when (ordToInt ord == op)
-        (readIORef frame >>= \f -> writeIORef (program_counter . code_segment $ f) (fromIntegral jmp))
+        | bc == 153 || bc == 159 || bc == 165 = flip condJmp [EQ]
+        | bc == 154 || bc == 160 || bc == 166 = flip condJmp [LT, GT]
+        | bc == 155 || bc == 161 = flip condJmp [LT]
+        | bc == 156 || bc == 162 = flip condJmp [GT, EQ]
+        | bc == 157 || bc == 163 = flip condJmp [GT]
+        | bc == 158 || bc == 164 = flip condJmp [LT, EQ]
+      condJmp :: Word16 -> [Ordering] -> IO ()
+      condJmp jmp ord = popOp frame >>= \op -> when (intToOrd op `elem` ord)
+        (readIORef frame >>= flip (writeIORef . program_counter . code_segment) (fromIntegral jmp))
       ordToInt ord = case ord of
         GT -> 1
         EQ -> 0
         LT -> -1
+      intToOrd int = case int of
+        1 -> GT
+        0 -> EQ
+        -1 -> LT
 
 
 

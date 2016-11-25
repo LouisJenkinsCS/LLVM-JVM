@@ -1,0 +1,66 @@
+Classfile /C:/github/Minimal-JVM/ConditionalTest.class
+  Last modified Nov 24, 2016; size 342 bytes
+  MD5 checksum 8f4ba641b3a06cd0389f3e7fdcc7df21
+  Compiled from "ConditionalTest.java"
+class ConditionalTest
+  minor version: 0
+  major version: 52
+  flags: ACC_SUPER
+Constant pool:
+   #1 = Methodref          #3.#13         // java/lang/Object."<init>":()V
+   #2 = Class              #14            // ConditionalTest
+   #3 = Class              #15            // java/lang/Object
+   #4 = Utf8               <init>
+   #5 = Utf8               ()V
+   #6 = Utf8               Code
+   #7 = Utf8               LineNumberTable
+   #8 = Utf8               main
+   #9 = Utf8               ([Ljava/lang/String;)V
+  #10 = Utf8               StackMapTable
+  #11 = Utf8               SourceFile
+  #12 = Utf8               ConditionalTest.java
+  #13 = NameAndType        #4:#5          // "<init>":()V
+  #14 = Utf8               ConditionalTest
+  #15 = Utf8               java/lang/Object
+{
+  ConditionalTest();
+    descriptor: ()V
+    flags:
+    Code:
+      stack=1, locals=1, args_size=1
+         0: aload_0
+         1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+         4: return
+      LineNumberTable:
+        line 2: 0
+
+  public static void main(java.lang.String[]);
+    descriptor: ([Ljava/lang/String;)V
+    flags: ACC_PUBLIC, ACC_STATIC
+    Code:
+      stack=2, locals=3, args_size=1
+         0: iconst_0
+         1: istore_1
+         2: iconst_0
+         3: istore_2
+         4: iload_2
+         5: bipush        100
+         7: if_icmpge     19
+        10: iinc          1, 1
+        13: iinc          2, 1
+        16: goto          4
+        19: return
+      LineNumberTable:
+        line 5: 0
+        line 6: 2
+        line 7: 10
+        line 6: 13
+        line 8: 19
+      StackMapTable: number_of_entries = 2
+        frame_type = 253 /* append */
+          offset_delta = 4
+          locals = [ int, int ]
+        frame_type = 250 /* chop */
+          offset_delta = 14
+}
+SourceFile: "ConditionalTest.java"

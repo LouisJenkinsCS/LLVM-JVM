@@ -70,6 +70,8 @@ module VirtualMachine.Types where
     (*) (VDouble x) (VDouble y) = VDouble (x * y)
     (*) _ _ = error "Bad Op: Multiplication"
 
+    fromInteger = VInt . fromIntegral
+
   instance Real Value where
     toRational (VInt x) = toRational x
     toRational (VLong x) = toRational x

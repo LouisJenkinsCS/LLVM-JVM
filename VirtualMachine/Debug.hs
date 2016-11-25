@@ -7,6 +7,7 @@ module VirtualMachine.Debug where
   import Control.Monad
   import Data.List
   import System.Console.ANSI
+  import Text.Printf
 
   debugFrame :: StackFrame -> IO String
   debugFrame frame = readIORef frame >>= \f -> readIORef (operand_stack f)
@@ -233,4 +234,4 @@ module VirtualMachine.Debug where
     254 -> "impdep1 (0xfe)"
     255 -> "impdep2 (0xff)"
     -- Bad OP code
-    _ -> error $ "Bad Op Code: " ++ show bc
+    _ -> printf "0x%x" bc
