@@ -160,11 +160,15 @@ module VirtualMachine.ByteCode where
         increment = -- 'iinc' has local variable index as first, with value as second indice
           join $ modifyLocal frame <$> getNextBC frame <*> ((+) . fromIntegral <$> getNextBC frame)
 
+  {- Conditional jump instructions ('if', 'for', and 'while') -}
   cmpOp :: StackFrame -> ByteCode -> IO ()
   cmpOp frame bc
     | bc >= 148 && bc <= 152 = pushCmp
-    | bc >= 153 && bc <= 166 = (program_counter . code_segment <$> readIORef frame) >>= readIORef
-      >>= \pc -> getNextShort frame >>= \jmp -> when (bc >= 159) pushCmp >> cmpJmp (fromIntegral pc + jmp - 1)
+    | bc >= 153 && bc <= 166 = getPC' frame >>= \pc -> getNextShort frame >>= \jmp ->
+      -- Special Case: We combine instructions which directly compare two different
+      -- values for a jump by first pushing the result of the comparison on the operand
+      -- stack, and THEN comparing them to save time and code.
+      when (bc >= 159) pushCmp >> cmpJmp (pc + jmp - 1)
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
     where
       pushCmp :: IO ()
@@ -179,21 +183,23 @@ module VirtualMachine.ByteCode where
         | bc == 156 || bc == 162 = flip condJmp [GT, EQ]
         | bc == 157 || bc == 163 = flip condJmp [GT]
         | bc == 158 || bc == 164 = flip condJmp [LT, EQ]
+        | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc
       condJmp :: Word16 -> [Ordering] -> IO ()
-      condJmp jmp ord = popOp frame >>= \op -> when (intToOrd op `elem` ord)
+      condJmp jmp ords = popOp frame >>= \cmp -> when (enumToOrd cmp `elem` ords)
         (readIORef frame >>= flip (writeIORef . program_counter . code_segment) (fromIntegral jmp))
+      ordToInt :: Ordering -> Int
       ordToInt ord = case ord of
         GT -> 1
         EQ -> 0
         LT -> -1
-      intToOrd int = case int of
+      enumToOrd :: Integral a => a -> Ordering
+      enumToOrd x = case x of
         1 -> GT
         0 -> EQ
         -1 -> LT
+        _ -> error "Bad Enumerable Value! "
 
-
-
-
+  {- Obtains the next ByteCode instruction and increments the PC -}
   getNextBC :: StackFrame -> IO ByteCode
   getNextBC frame = readIORef frame >>= \f -> -- Read StackFrame from passed reference
     let segment = code_segment f in -- Retrieve current set of instructions
@@ -201,5 +207,7 @@ module VirtualMachine.ByteCode where
     modifyIORef (program_counter segment) (+1) >> -- Increment PC
     return (byte_code segment !! fromIntegral n) -- Return ByteCode instruction
 
+  {- Obtains the next two ByteCode instructions as a short, and increments the PC by 2 -}
   getNextShort :: StackFrame -> IO Word16
-  getNextShort frame = replicateM 2 (getNextBC frame) >>= \(i1:i2:_) -> return $ fromIntegral i1 `shift` 8 .|. fromIntegral i2
+  getNextShort frame = replicateM 2 (getNextBC frame) >>= \(i1:i2:_) ->
+    return $ fromIntegral i1 `shift` 8 .|. fromIntegral i2
