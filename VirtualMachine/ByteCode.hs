@@ -78,7 +78,8 @@ module VirtualMachine.ByteCode where
         "toString" -> return () -- StringBuilder object is already a 'VString'
         _ -> error "Bad Method Call!"
     -- Invokespecial is used to call <init>, but we don't deal with that... yet
-    | bc == 183 = void $ getNextShort frame
+    -- Invokestatic is also used Scala compatibility, which we can safely ignore
+    | bc == 183 || bc == 184 = void $ getNextShort frame
     -- Laziness: 'new' must refer to StringBuilder... otherwise it's undefined anyway
     | bc == 187 = getNextShort frame >> pushOp frame (VString "")
     | otherwise = error $ "Bad ByteCode Instruction: " ++ show bc

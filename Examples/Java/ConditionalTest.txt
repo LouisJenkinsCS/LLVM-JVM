@@ -1,0 +1,110 @@
+Classfile /C:/github/Minimal-JVM/ConditionalTest.class
+  Last modified Nov 25, 2016; size 716 bytes
+  MD5 checksum 23360d50cddaa082c043a9bf8978cdf8
+  Compiled from "ConditionalTest.java"
+class ConditionalTest
+  minor version: 0
+  major version: 52
+  flags: ACC_SUPER
+Constant pool:
+   #1 = Methodref          #12.#22        // java/lang/Object."<init>":()V
+   #2 = Fieldref           #23.#24        // java/lang/System.out:Ljava/io/PrintStream;
+   #3 = Class              #25            // java/lang/StringBuilder
+   #4 = Methodref          #3.#22         // java/lang/StringBuilder."<init>":()V
+   #5 = String             #26            // Idx:
+   #6 = Methodref          #3.#27         // java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+   #7 = Methodref          #3.#28         // java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+   #8 = String             #29            // ;Val:
+   #9 = Methodref          #3.#30         // java/lang/StringBuilder.toString:()Ljava/lang/String;
+  #10 = Methodref          #31.#32        // java/io/PrintStream.println:(Ljava/lang/String;)V
+  #11 = Class              #33            // ConditionalTest
+  #12 = Class              #34            // java/lang/Object
+  #13 = Utf8               <init>
+  #14 = Utf8               ()V
+  #15 = Utf8               Code
+  #16 = Utf8               LineNumberTable
+  #17 = Utf8               main
+  #18 = Utf8               ([Ljava/lang/String;)V
+  #19 = Utf8               StackMapTable
+  #20 = Utf8               SourceFile
+  #21 = Utf8               ConditionalTest.java
+  #22 = NameAndType        #13:#14        // "<init>":()V
+  #23 = Class              #35            // java/lang/System
+  #24 = NameAndType        #36:#37        // out:Ljava/io/PrintStream;
+  #25 = Utf8               java/lang/StringBuilder
+  #26 = Utf8               Idx:
+  #27 = NameAndType        #38:#39        // append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+  #28 = NameAndType        #38:#40        // append:(I)Ljava/lang/StringBuilder;
+  #29 = Utf8               ;Val:
+  #30 = NameAndType        #41:#42        // toString:()Ljava/lang/String;
+  #31 = Class              #43            // java/io/PrintStream
+  #32 = NameAndType        #44:#45        // println:(Ljava/lang/String;)V
+  #33 = Utf8               ConditionalTest
+  #34 = Utf8               java/lang/Object
+  #35 = Utf8               java/lang/System
+  #36 = Utf8               out
+  #37 = Utf8               Ljava/io/PrintStream;
+  #38 = Utf8               append
+  #39 = Utf8               (Ljava/lang/String;)Ljava/lang/StringBuilder;
+  #40 = Utf8               (I)Ljava/lang/StringBuilder;
+  #41 = Utf8               toString
+  #42 = Utf8               ()Ljava/lang/String;
+  #43 = Utf8               java/io/PrintStream
+  #44 = Utf8               println
+  #45 = Utf8               (Ljava/lang/String;)V
+{
+  ConditionalTest();
+    descriptor: ()V
+    flags:
+    Code:
+      stack=1, locals=1, args_size=1
+         0: aload_0
+         1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+         4: return
+      LineNumberTable:
+        line 2: 0
+
+  public static void main(java.lang.String[]);
+    descriptor: ([Ljava/lang/String;)V
+    flags: ACC_PUBLIC, ACC_STATIC
+    Code:
+      stack=3, locals=3, args_size=1
+         0: iconst_0
+         1: istore_1
+         2: iconst_0
+         3: istore_2
+         4: iload_2
+         5: bipush        100
+         7: if_icmpge     53
+        10: getstatic     #2                  // Field java/lang/System.out:Ljava/io/PrintStream;
+        13: new           #3                  // class java/lang/StringBuilder
+        16: dup
+        17: invokespecial #4                  // Method java/lang/StringBuilder."<init>":()V
+        20: ldc           #5                  // String Idx:
+        22: invokevirtual #6                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+        25: iload_2
+        26: invokevirtual #7                  // Method java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+        29: ldc           #8                  // String ;Val:
+        31: invokevirtual #6                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+        34: iload_1
+        35: iinc          1, 1
+        38: invokevirtual #7                  // Method java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+        41: invokevirtual #9                  // Method java/lang/StringBuilder.toString:()Ljava/lang/String;
+        44: invokevirtual #10                 // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+        47: iinc          2, 1
+        50: goto          4
+        53: return
+      LineNumberTable:
+        line 5: 0
+        line 6: 2
+        line 7: 10
+        line 6: 47
+        line 8: 53
+      StackMapTable: number_of_entries = 2
+        frame_type = 253 /* append */
+          offset_delta = 4
+          locals = [ int, int ]
+        frame_type = 250 /* chop */
+          offset_delta = 48
+}
+SourceFile: "ConditionalTest.java"
