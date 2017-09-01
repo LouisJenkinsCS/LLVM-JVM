@@ -119,8 +119,7 @@ module VirtualMachine.Types where
   data Runtime_Environment = Environment {
     current_class :: IORef Class,
     class_map :: IORef (Map String Class),
-    stack :: Stack,
-    debug_mode :: Bool
+    stack :: Stack
   }
 
   {- | Representation of a stack frame. -}

@@ -8,6 +8,7 @@ module VirtualMachine.ByteCode where
   import VirtualMachine.Debug
   import VirtualMachine.Stack_Frame
   import Data.Binary.IEEE754
+  import Misc.Logger
 
   loadConstantPool :: Runtime_Environment -> Int -> IO Value
   loadConstantPool env idx = (!! idx) . constant_pool <$> readIORef (current_class env) >>= toValue
@@ -24,7 +25,7 @@ module VirtualMachine.ByteCode where
   {- | Starting point of execution of ByteCode isntructions -}
   execute :: Runtime_Environment -> IO ()
   execute env = head <$> readIORef (stack env)  -- Take the head of the stack (current stack frame)
-    >>= \frame -> when (debug_mode env) (debugFrame frame >>= putStrLn) -- Optional Debug
+    >>= \frame -> when debugMode (debugFrame frame >>= debugIO)
     >> getPC' frame >>= \pc -> maxPC frame >>= \max_pc -> -- Program Counters for comparison
     -- While valid program_counter, execute instruction
     unless (pc >= max_pc) (getNextBC frame >>= execute' frame >> execute env)

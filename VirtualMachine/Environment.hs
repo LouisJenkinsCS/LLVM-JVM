@@ -7,13 +7,13 @@ module VirtualMachine.Environment where
   import VirtualMachine.Stack
   import VirtualMachine.ByteCode
   import Data.Maybe
+  import Misc.Logger
 
   {- | Starting point for the runtime, invoked to instantiate the runtime environment -}
-  init :: Bool -> IO Runtime_Environment
-  init debug = Environment <$> newIORef undefined -- 'current_class' is not available yet
+  init :: IO Runtime_Environment
+  init = Environment <$> newIORef undefined -- 'current_class' is not available yet
     <*> newIORef Map.empty -- 'class_map' is originally empty
     <*> newIORef []  -- The 'stack' is initially empty
-    <*> return debug -- 'debug' is used for conditional logging
 
   {- | Minimal bootstrap class loader -}
   loadClass :: Runtime_Environment -> ClassFile -> IO ()

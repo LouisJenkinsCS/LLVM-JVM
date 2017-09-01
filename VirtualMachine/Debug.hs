@@ -8,6 +8,7 @@ module VirtualMachine.Debug where
   import Data.List
   import System.Console.ANSI
   import Text.Printf
+  import Misc.Logger
 
   debugFrame :: StackFrame -> IO String
   debugFrame frame = readIORef frame >>= \f -> readIORef (operand_stack f)

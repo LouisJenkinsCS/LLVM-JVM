@@ -4,7 +4,6 @@ module ClassFile.Types where
   import Control.Monad.State
   import Data.ByteString.Char8
   import Data.ByteString
-
   {-
     Parser
   -}
