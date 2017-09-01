@@ -3,12 +3,9 @@ module Main where
   import qualified Data.ByteString as BS
   import ClassFile.Parser
   import VirtualMachine.Environment
-  import Control.Monad
-  import Data.IORef
   import System.Environment;
   import System.IO
   import Misc.Logger
-
 
 
   main :: IO ()
@@ -17,10 +14,10 @@ module Main where
     hSetBuffering stdout LineBuffering
     file <- getArgs >>= BS.readFile . head
     let classFile = parseClassFile file
-    debugIO $ show classFile
-    debugIO "Initializing Runtime Environment..."
+    debugM $ show classFile
+    debugM "Initializing Runtime Environment..."
     env <- VirtualMachine.Environment.init
-    debugIO "Loading bootstrap class..."
+    debugM "Loading bootstrap class..."
     loadClass env classFile
-    debugIO "Starting Virtual Machine..."
+    debugM "Starting Virtual Machine..."
     VirtualMachine.Environment.start env

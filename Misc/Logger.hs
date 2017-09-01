@@ -4,12 +4,12 @@ module Misc.Logger where
 
   -- Determines whether or not we print log messages
   debugMode :: Bool
-  debugMode = True
+  debugMode = False
 
   -- Logs if `debug` is True
   debug :: String -> ()
-  debug str = when debugMode (trace ("DEBUG: " ++ str)) ()
+  debug str = if debugMode then trace ("DEBUG: " ++ str) () else ()
 
-  -- Wrappers for when inside IO monad
-  debugIO :: String -> IO ()
-  debugIO = return . debug
+  -- Wrappers for when inside IO monad. This method is strict and evaluated immediately.
+  debugM :: Monad m => String -> m ()
+  debugM str = return $! debug str

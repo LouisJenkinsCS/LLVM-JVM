@@ -7,6 +7,7 @@ module ClassFile.Parser where
   import Data.Word
   import Control.Monad.State.Lazy
   import ClassFile.Types
+  import Misc.Logger
 
   {-
     Parser implementation
@@ -70,7 +71,6 @@ module ClassFile.Parser where
     >> parseConstants >>= \cp -> ClassFile cp <$> getNextShort <*> getNextShort <*> getNextShort
     <*> parseInterfaces <*> parseFields cp <*> parseMethods cp <*> parseAttributes cp
 
-
   parseConstants :: Parser [CP_Info]
   parseConstants = getNextShort >>= \n -> replicateM (fromIntegral n - 1) parseConstant
     >>= \cp -> return $ Dummy_Info : cp
@@ -94,7 +94,9 @@ module ClassFile.Parser where
             15 -> MethodHandle_Info t <$> getNextByte <*> getNextShort
             16 -> MethodType_Info t <$> getNextShort
             18 -> InvokeDynamic_Info t <$> getNextShort <*> getNextShort
-            _ -> undefined
+            _ -> error ("Bad Constant Tag: " ++ show t)
+
+
 
   parseAttributes :: [CP_Info] -> Parser [Attribute_Info]
   parseAttributes cp = getNextShort >>= \n -> replicateM (fromIntegral n) parseAttribute

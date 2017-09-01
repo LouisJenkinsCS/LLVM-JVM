@@ -25,7 +25,7 @@ module VirtualMachine.ByteCode where
   {- | Starting point of execution of ByteCode isntructions -}
   execute :: Runtime_Environment -> IO ()
   execute env = head <$> readIORef (stack env)  -- Take the head of the stack (current stack frame)
-    >>= \frame -> when debugMode (debugFrame frame >>= debugIO)
+    >>= \frame -> when debugMode (debugFrame frame >>= debugM)
     >> getPC' frame >>= \pc -> maxPC frame >>= \max_pc -> -- Program Counters for comparison
     -- While valid program_counter, execute instruction
     unless (pc >= max_pc) (getNextBC frame >>= execute' frame >> execute env)

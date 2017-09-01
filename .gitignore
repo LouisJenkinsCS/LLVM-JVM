@@ -1,1 +1,3 @@
 Documentation/
+*.hi
+*.o
