@@ -1,4 +1,4 @@
-module Parser.Class.Helper where
+module Parser.Class.Helpers where
   -- Imports needed to operate on raw bytes
   import Data.Bits ((.|.), shiftL, Bits)
   import Data.Word (Word8, Word16, Word32, Word64)
@@ -55,14 +55,14 @@ module Parser.Class.Helper where
     Below we define helpful utility functions which return words of specific sizes.
   -}
 
-  toWord8 :: Parser Word8
-  toWord8 = readBytes (1 :: Int)
+  getWord8 :: Parser Word8
+  getWord8 = readBytes (1 :: Int)
 
-  toWord16 :: Parser Word16
-  toWord16 = readBytes (2 :: Int)
+  getWord16 :: Parser Word16
+  getWord16 = readBytes (2 :: Int)
 
-  toWord32 :: Parser Word32
-  toWord32 = readBytes (4 :: Int)
+  getWord32 :: Parser Word32
+  getWord32 = readBytes (4 :: Int)
 
-  toWord64 :: Parser Word64
-  toWord64 = readBytes (8 :: Int)
+  getWord64 :: Parser Word64
+  getWord64 = readBytes (8 :: Int)
