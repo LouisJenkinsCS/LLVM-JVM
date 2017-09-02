@@ -1,5 +1,5 @@
 module VirtualMachine.Class where
-  import ClassFile.Types
+  import Parser.Types
   import VirtualMachine.Types
   import GHC.IORef
   import qualified Data.Map as Map

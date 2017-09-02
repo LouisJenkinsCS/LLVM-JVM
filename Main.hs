@@ -1,9 +1,10 @@
 module Main where
   import GHC.IO.Encoding
   import qualified Data.ByteString as BS
-  import ClassFile.Parser
+  import Parser.Class.Constants
   import VirtualMachine.Environment
-  import System.Environment;
+  import System.Environment
+  import Parser.Parser
   import System.IO
   import Misc.Logger
 

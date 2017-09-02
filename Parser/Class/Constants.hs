@@ -1,14 +1,18 @@
 module Parser.Class.Constants where
   -- Imports for type declarations
   import Data.Word (Word8, Word16, Word32)
+  import Data.ByteString.Lazy (ByteString())
+  import qualified Data.ByteString.Lazy as LazyByteString
 
   -- Imports for parsec
-  import Text.Parsec ((<?>), (<|>))
-  import Text.Parsec.ByteString
+  import Text.Parsec ((<?>), (<|>), getInput, getState, parse, ParseError)
+  import Text.Parsec.ByteString.Lazy
 
   -- Imports for helper methods
   import Parser.Class.Helpers (getWord8, getWord16, getWord32, getWord64)
   import Control.Monad (replicateM)
+  import Misc.Logger
+  import Debug.Trace
 
   {-
     Types for Constant Pool
@@ -90,7 +94,7 @@ module Parser.Class.Constants where
 
     show (CPUtf8 _utf8Bytes) =
       "CONSTANT_Utf8{" ++
-        "bytes[" ++ (show . length $ _utf8Bytes) ++ "]=" ++ show _utf8Bytes ++
+        "bytes[" ++ (show . Prelude.length $ _utf8Bytes) ++ "]=" ++ show _utf8Bytes ++
       "}"
 
     show (CPMethodHandle _referenceKind _referenceIndex) =
@@ -119,6 +123,7 @@ module Parser.Class.Constants where
   parseConstants :: Parser [CPConstant]
   parseConstants = do
     cpCount <- getWord16
+    debugM ("constant_pool_count=" ++ show (cpCount - 1))
     replicateM (fromIntegral cpCount - 1) parseConstant
 
   -- Parse a constant object by its tag. The first word must be a valid tag for

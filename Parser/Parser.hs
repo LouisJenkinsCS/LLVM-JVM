@@ -1,4 +1,4 @@
-module ClassFile.Parser where
+module Parser.Parser where
   import Data.Bits (shift, (.|.), Bits())
   import Data.ByteString.Char8
   import Data.ByteString
@@ -6,7 +6,7 @@ module ClassFile.Parser where
   import Prelude hiding (splitAt)
   import Data.Word
   import Control.Monad.State.Lazy
-  import ClassFile.Types
+  import Parser.Types
   import Misc.Logger
 
   {-

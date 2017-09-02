@@ -1,4 +1,4 @@
-module ClassFile.Types where
+module Parser.Types where
   import Data.Word
   import Data.Bits
   import Control.Monad.State

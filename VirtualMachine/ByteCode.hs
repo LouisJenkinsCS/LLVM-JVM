@@ -4,7 +4,7 @@ module VirtualMachine.ByteCode where
   import Data.Word
   import Control.Monad
   import VirtualMachine.Types
-  import ClassFile.Types
+  import Parser.Types
   import VirtualMachine.Debug
   import VirtualMachine.Stack_Frame
   import Data.Binary.IEEE754

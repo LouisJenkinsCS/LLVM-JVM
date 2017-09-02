@@ -2,7 +2,7 @@ module VirtualMachine.Environment where
   import Data.IORef
   import qualified Data.Map as Map
   import VirtualMachine.Types
-  import ClassFile.Types
+  import Parser.Types
   import VirtualMachine.Class
   import VirtualMachine.Stack
   import VirtualMachine.ByteCode

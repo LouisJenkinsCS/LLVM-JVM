@@ -3,7 +3,7 @@ module VirtualMachine.Types where
   import Data.IORef
   import Data.Bits
   import Data.Map
-  import ClassFile.Types
+  import Parser.Types
   import Text.Printf
 
 
