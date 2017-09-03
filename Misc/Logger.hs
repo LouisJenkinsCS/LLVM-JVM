@@ -1,6 +1,5 @@
 module Misc.Logger where
   import Debug.Trace
-  import Control.Monad
 
   -- Determines whether or not we print log messages
   debugMode :: Bool

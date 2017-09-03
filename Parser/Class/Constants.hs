@@ -1,18 +1,14 @@
 module Parser.Class.Constants where
   -- Imports for type declarations
   import Data.Word (Word8, Word16, Word32)
-  import Data.ByteString.Lazy (ByteString())
-  import qualified Data.ByteString.Lazy as LazyByteString
 
   -- Imports for parsec
-  import Text.Parsec ((<?>), (<|>), getInput, getState, parse, ParseError)
-  import Text.Parsec.ByteString.Lazy
+  import Text.Parsec.ByteString.Lazy(Parser)
 
   -- Imports for helper methods
-  import Parser.Class.Helpers (getWord8, getWord16, getWord32, getWord64)
+  import Parser.Class.Helpers (getWord8, getWord16, getWord32)
   import Control.Monad (replicateM)
   import Misc.Logger
-  import Debug.Trace
 
   {-
     Types for Constant Pool
@@ -142,7 +138,7 @@ module Parser.Class.Constants where
       5 -> CPLong <$> getWord32 <*> getWord32
       6 -> CPDouble <$> getWord32 <*> getWord32
       12 -> CPNameAndType <$> getWord16 <*> getWord16
-      1 -> CPUtf8 <$> (getWord16 >>= \len -> replicateM (fromIntegral len) getWord8)
+      1 -> CPUtf8 <$> ((fromIntegral <$> getWord16) >>= flip replicateM getWord8)
       15 -> CPMethodHandle <$> getWord8 <*> getWord16
       16 -> CPMethodType <$> getWord16
       18 -> CPInvokeDynamic <$> getWord16 <*> getWord16
