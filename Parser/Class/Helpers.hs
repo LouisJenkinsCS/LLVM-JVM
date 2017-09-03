@@ -14,8 +14,7 @@ module Parser.Class.Helpers where
   import Text.Parsec.ByteString.Lazy
 
   {-
-    Custom Parsec Tokenizers. As Parsec does not directly support parsing operations
-    directly on ByteStrings, we convert bytes to-and-from characters.
+    Custom Parsec Tokenizers.
   -}
 
   noneOf :: String -> Parser Word8
@@ -37,13 +36,13 @@ module Parser.Class.Helpers where
   string :: String -> Parser ByteString
   string s = Char8.pack <$> tokens show updatePosString s
 
-  -- Convert the bytes in big endian order. Note that this effectively reverses
-  -- the entire ByteString, and as such only the portion of the ByteString to
-  -- be parsed should be passed...
+  {-
+    Core Parse Functions.
+  -}
+
   toBigEndian :: (Bits a, Num a) => ByteString -> a
   toBigEndian = LazyByteString.foldl' (\x y -> x `shiftL` 8 .|. fromIntegral y) 0
 
-  -- Helper method to obtain the next 'n' bytes in big endian order.
   readBytes :: (Integral a, Num b, Bits b) => a -> Parser b
   readBytes n = do
     val <- count (fromIntegral n) anyChar
@@ -52,9 +51,7 @@ module Parser.Class.Helpers where
 
 
   {-
-    Below we define helpful utility functions which return words of specific sizes.
-    We also add a convenience version which returns it as an Integral, which is
-    suffixed with an 'i'.
+    Convenience Parse Functions.
   -}
 
   getWord8 :: Parser Word8

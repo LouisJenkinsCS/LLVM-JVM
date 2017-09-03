@@ -14,7 +14,7 @@ module Parser.Class.Fields where
     Types
   -}
 
-  -- Runtime representation of a '.class' file's fields.
+  -- Parsed representation of a '.class' file's fields.
   data Field = Field {
     accessFlags :: Word16,
     nameIndex :: Word16,

@@ -13,7 +13,7 @@ module Parser.Class.Attributes where
     Types
   -}
 
-  -- Runtime representation of a '.class' file's attributes.
+  -- Parser Representation of a '.class' file's attributes.
   data Attribute = Attribute {
     attributeNameIndex :: Word16,
     info :: [Word8]

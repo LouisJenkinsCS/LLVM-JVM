@@ -19,15 +19,9 @@ module Parser.Class.ClassFile where
     Types
   -}
 
-  -- A ClassFile is the runtime-equivalent to Java's '.class' files, and is parsed
-  -- accordingly to the JVM Specification.
+  -- Parsed representation of a '.class' file.
   data ClassFile = ClassFile {
-    -- Constant Pool containts both the compile-time constants (such as strings,
-    -- integers, and other literals) as well as class metadata such as a fields,
-    -- methods, attributes, etc.
     constantPool :: [CPConstant],
-    -- All interfaces this class inherits; these are indexes into constantPool
-    -- to a CPClass constant.
     interfaces :: [Word16],
     fields :: [Field],
     methods :: [Method],

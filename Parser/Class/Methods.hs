@@ -13,6 +13,8 @@ module Parser.Class.Methods where
   {-
     Types
   -}
+
+  -- Parsed representation of a '.class' file's methods.
   data Method = Method {
     accessFlag :: Word16,
     nameIndex :: Word16,

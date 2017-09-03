@@ -14,7 +14,7 @@ module Parser.Class.Constants where
     Types for Constant Pool
   -}
 
-  -- Constant Pool types
+  -- Parsed representation of a '.class' file's constant-pool constants.
   data CPConstant = CPClass { nameIndex :: Word16 }
     | CPFieldref { classIndex :: Word16, nameAndTypeIndex :: Word16 }
     | CPMethodref { classIndex :: Word16, nameAndTypeIndex :: Word16 }
@@ -29,101 +29,18 @@ module Parser.Class.Constants where
     | CPMethodHandle { referenceKind :: Word8, referenceIndex :: Word16 }
     | CPMethodType { descriptorIndex :: Word16 }
     | CPInvokeDynamic { bootstrapMethodAttrIndex :: Word16, nameAndTypeIndex :: Word16 }
-
-  -- Custom 'showable' for better debugging
-  instance Show CPConstant where
-    show (CPClass _nameIndex) =
-      "CONSTANT_Class{" ++
-        "name_index=" ++ show _nameIndex ++
-      "}"
-
-    show (CPFieldref _classIndex _nameAndTypeIndex) =
-      "CONSTANT_Fieldref{" ++
-        "class_index=" ++ show _classIndex ++
-        ",name_and_type_index=" ++ show _nameAndTypeIndex ++
-      "}"
-
-    show (CPMethodref _classIndex _nameAndTypeIndex) =
-      "CONSTANT_Methodref{" ++
-        "class_index=" ++ show _classIndex ++
-        ",name_and_type_index=" ++ show _nameAndTypeIndex ++
-      "}"
-
-    show (CPInterfaceMethodref _classIndex _nameAndTypeIndex) =
-      "CONSTANT_InterfaceMethodref{" ++
-        "class_index=" ++ show _classIndex ++
-        ",name_and_type_index=" ++ show _nameAndTypeIndex ++
-      "}"
-
-    show (CPString _stringIndex) =
-      "CONSTANT_String{" ++
-        "string_index=" ++ show _stringIndex ++
-      "}"
-
-    show (CPInteger _bytes) =
-      "CONSTANT_Integer{" ++
-        "bytes=" ++ show _bytes ++
-      "}"
-
-    show (CPFloat _bytes) =
-      "CONSTANT_Float{" ++
-        "bytes=" ++ show _bytes ++
-      "}"
-
-    show (CPLong _highBytes _lowBytes) =
-      "CONSTANT_Long{" ++
-        "high_bytes=" ++ show _highBytes ++
-        ",low_bytes=" ++ show _lowBytes ++
-      "}"
-
-    show (CPDouble _highBytes _lowBytes) =
-      "CONSTANT_Double{" ++
-        "high_bytes=" ++ show _highBytes ++
-        ",low_bytes=" ++ show _lowBytes ++
-      "}"
-
-    show (CPNameAndType _nameAndTypeIndex _descriptorIndex) =
-      "CONSTANT_NameAndType{" ++
-        "name_and_type_index=" ++ show _nameAndTypeIndex ++
-        ",descriptor_index=" ++ show _descriptorIndex ++
-      "}"
-
-    show (CPUtf8 _utf8Bytes) =
-      "CONSTANT_Utf8{" ++
-        "bytes[" ++ (show . Prelude.length $ _utf8Bytes) ++ "]=" ++ show _utf8Bytes ++
-      "}"
-
-    show (CPMethodHandle _referenceKind _referenceIndex) =
-      "CONSTANT_MethodHandle{" ++
-        "reference_kind=" ++ show _referenceKind ++
-        ",reference_index=" ++ show _referenceIndex ++
-      "}"
-
-    show (CPMethodType _descriptorIndex) =
-      "CONSTANT_MethodType{" ++
-        "descriptor_index=" ++ show _descriptorIndex ++
-      "}"
-
-    show (CPInvokeDynamic _bootstrapMethodAttrIndex _nameAndTypeIndex) =
-      "CONSTANT_InvokeDynamic{" ++
-        "bootstrap_method_attr_index=" ++ show _bootstrapMethodAttrIndex ++
-        ",name_and_type_index=" ++ show _nameAndTypeIndex ++
-      "}"
+      deriving Show
 
   {-
     Parse functions
   -}
 
-  -- Parses all constant pool objects. The first word must be the classfile's
-  -- 'constant_pool_count', which specifies the number of constants that follow.
   parseConstants :: Parser [CPConstant]
   parseConstants = do
     cpCount <- getWord16
     debugM ("constant_pool_count=" ++ show (cpCount - 1))
     replicateM (fromIntegral cpCount - 1) parseConstant
 
-  -- Parse a constant object by its tag. The first word must be a valid tag for
-  -- a constant pool object.
   parseConstant :: Parser CPConstant
   parseConstant = do
     tag <- getWord8
