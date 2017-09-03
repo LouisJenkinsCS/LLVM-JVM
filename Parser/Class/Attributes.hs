@@ -17,7 +17,7 @@ module Parser.Class.Attributes where
   data Attribute = Attribute {
     attributeNameIndex :: Word16,
     info :: [Word8]
-  }
+  } deriving Show
 
   {-
     Parse functions

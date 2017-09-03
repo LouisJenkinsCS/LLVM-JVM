@@ -18,7 +18,7 @@ module Parser.Class.Methods where
     nameIndex :: Word16,
     descriptorIndex :: Word16,
     attributes :: [Attribute]
-  }
+  } deriving Show
 
   {-
     Parser Functions

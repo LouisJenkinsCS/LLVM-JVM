@@ -1,7 +1,6 @@
 module Main where
   import GHC.IO.Encoding
   import qualified Data.ByteString as BS
-  import Parser.Class.Constants
   import VirtualMachine.Environment
   import System.Environment
   import Parser.Parser

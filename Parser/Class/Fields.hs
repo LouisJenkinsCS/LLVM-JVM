@@ -20,7 +20,7 @@ module Parser.Class.Fields where
     nameIndex :: Word16,
     descriptorIndex :: Word16,
     attributes :: [Attribute]
-  }
+  } deriving Show
 
   {-
     Parse functions

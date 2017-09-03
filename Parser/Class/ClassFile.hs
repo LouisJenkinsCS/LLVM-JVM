@@ -32,7 +32,7 @@ module Parser.Class.ClassFile where
     fields :: [Field],
     methods :: [Method],
     attributes :: [Attribute]
-  }
+  } deriving Show
 
   {-
     Parse Functions
