@@ -53,16 +53,30 @@ module Parser.Class.Helpers where
 
   {-
     Below we define helpful utility functions which return words of specific sizes.
+    We also add a convenience version which returns it as an Integral, which is
+    suffixed with an 'i'.
   -}
 
   getWord8 :: Parser Word8
   getWord8 = readBytes (1 :: Int)
 
+  getWord8i :: (Integral a) => Parser a
+  getWord8i = fromIntegral <$> getWord8
+
   getWord16 :: Parser Word16
   getWord16 = readBytes (2 :: Int)
+
+  getWord16i :: (Integral a) => Parser a
+  getWord16i = fromIntegral <$> getWord16
 
   getWord32 :: Parser Word32
   getWord32 = readBytes (4 :: Int)
 
+  getWord32i :: (Integral a) => Parser a
+  getWord32i = fromIntegral <$> getWord32
+
   getWord64 :: Parser Word64
   getWord64 = readBytes (8 :: Int)
+
+  getWord64i :: (Integral a) => Parser a
+  getWord64i = fromIntegral <$> getWord64

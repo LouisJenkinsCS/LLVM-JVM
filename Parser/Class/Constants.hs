@@ -6,7 +6,7 @@ module Parser.Class.Constants where
   import Text.Parsec.ByteString.Lazy(Parser)
 
   -- Imports for helper methods
-  import Parser.Class.Helpers (getWord8, getWord16, getWord32)
+  import Parser.Class.Helpers (getWord8, getWord16, getWord16i, getWord32)
   import Control.Monad (replicateM)
   import Misc.Logger
 
@@ -138,7 +138,7 @@ module Parser.Class.Constants where
       5 -> CPLong <$> getWord32 <*> getWord32
       6 -> CPDouble <$> getWord32 <*> getWord32
       12 -> CPNameAndType <$> getWord16 <*> getWord16
-      1 -> CPUtf8 <$> ((fromIntegral <$> getWord16) >>= flip replicateM getWord8)
+      1 -> CPUtf8 <$> (getWord16i >>= flip replicateM getWord8)
       15 -> CPMethodHandle <$> getWord8 <*> getWord16
       16 -> CPMethodType <$> getWord16
       18 -> CPInvokeDynamic <$> getWord16 <*> getWord16
