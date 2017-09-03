@@ -10,8 +10,13 @@ module Parser.Class.Helpers where
   -- Imports needed for parsing (Parsec)
   import Text.Parsec.Prim (tokens, tokenPrim)
   import Text.Parsec.Pos (updatePosChar, updatePosString)
-  import Text.Parsec ((<?>), count, anyChar)
-  import Text.Parsec.ByteString.Lazy
+  import Text.Parsec (Parsec, (<?>), count, anyChar)
+
+  {-
+    Types
+  -}
+
+  type Parser = Parsec ByteString Bool
 
   {-
     Custom Parsec Tokenizers.

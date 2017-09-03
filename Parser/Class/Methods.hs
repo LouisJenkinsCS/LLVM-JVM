@@ -2,11 +2,8 @@ module Parser.Class.Methods where
   -- Imports for type declarations
   import Data.Word (Word16)
 
-  -- Imports for parsec
-  import Text.Parsec.ByteString.Lazy(Parser)
-
   -- Imports for helper methods
-  import Parser.Class.Helpers (getWord16, getWord16i)
+  import Parser.Class.Helpers (Parser, getWord16, getWord16i)
   import Parser.Class.Attributes (Attribute, parseAttributes)
   import Control.Monad (replicateM)
 

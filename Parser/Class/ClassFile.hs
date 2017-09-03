@@ -5,10 +5,9 @@ module Parser.Class.ClassFile where
 
   -- Imports for parsec
   import Text.Parsec(parse, ParseError)
-  import Text.Parsec.ByteString.Lazy (Parser)
 
   -- Imports for helper methods
-  import Parser.Class.Helpers (getWord16, getWord16i, getWord32)
+  import Parser.Class.Helpers (Parser, getWord16, getWord16i, getWord32)
   import Parser.Class.Constants (CPConstant, parseConstants)
   import Parser.Class.Fields (Field, parseFields)
   import Parser.Class.Methods (Method, parseMethods)

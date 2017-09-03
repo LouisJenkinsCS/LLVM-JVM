@@ -3,11 +3,11 @@ module Parser.Class.Constants where
   import Data.Word (Word8, Word16, Word32)
 
   -- Imports for parsec
-  import Text.Parsec.ByteString.Lazy(Parser)
+  import Text.Parsec (getState, putState)
 
   -- Imports for helper methods
-  import Parser.Class.Helpers (getWord8, getWord16, getWord16i, getWord32)
-  import Control.Monad (replicateM)
+  import Parser.Class.Helpers (Parser, getWord8, getWord16, getWord16i, getWord32)
+  import Control.Monad (replicateM, when)
 
   {-
     Types for Constant Pool
@@ -28,6 +28,7 @@ module Parser.Class.Constants where
     | CPMethodHandle { referenceKind :: Word8, referenceIndex :: Word16 }
     | CPMethodType { descriptorIndex :: Word16 }
     | CPInvokeDynamic { bootstrapMethodAttrIndex :: Word16, nameAndTypeIndex :: Word16 }
+    | CPDummy
       deriving Show
 
   {-
@@ -37,9 +38,23 @@ module Parser.Class.Constants where
   parseConstants :: Parser [CPConstant]
   parseConstants = ((`subtract` 1) <$> getWord16i) >>= flip replicateM parseConstant
 
+  -- The JVM Specification states that both CPLong and CPDouble are 'double width'
+  -- in that they take up two entries instead of one. Hence, when we read one, we
+  -- need to ensure that we skip an additional slot. To do this, we store whether
+  -- we need to skip over an iteration as our user-state.
   parseConstant :: Parser CPConstant
   parseConstant = do
+
+    -- Check if we need to skip and reset state if we do.
+    skip <- getState
+    if skip then putState False >> return CPDummy else do
+
+    -- Check if we are processing double-width constant and mark that
+    -- we need to skip next time.
     tag <- getWord8
+    when (tag == 5 || tag == 6) $ putState True
+
+    -- Parse the actual constants based on their tag.
     case tag of
       7 -> CPClass <$> getWord16
       9 -> CPFieldref <$> getWord16 <*> getWord16
