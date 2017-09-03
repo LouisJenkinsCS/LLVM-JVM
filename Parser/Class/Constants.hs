@@ -8,7 +8,6 @@ module Parser.Class.Constants where
   -- Imports for helper methods
   import Parser.Class.Helpers (getWord8, getWord16, getWord16i, getWord32)
   import Control.Monad (replicateM)
-  import Misc.Logger
 
   {-
     Types for Constant Pool
@@ -36,10 +35,7 @@ module Parser.Class.Constants where
   -}
 
   parseConstants :: Parser [CPConstant]
-  parseConstants = do
-    cpCount <- getWord16
-    debugM ("constant_pool_count=" ++ show (cpCount - 1))
-    replicateM (fromIntegral cpCount - 1) parseConstant
+  parseConstants = ((`subtract` 1) <$> getWord16i) >>= flip replicateM parseConstant
 
   parseConstant :: Parser CPConstant
   parseConstant = do
