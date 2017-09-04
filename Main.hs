@@ -1,7 +1,7 @@
 module Main where
   import GHC.IO.Encoding
-  import qualified Data.ByteString as BS
-  import VirtualMachine.Environment
+  import qualified Data.ByteString as LazyByteString
+  import Runtime.Environment
   import System.Environment
   import Parser.Parser
   import System.IO
@@ -12,12 +12,12 @@ module Main where
   main = do
     setLocaleEncoding utf8
     hSetBuffering stdout LineBuffering
-    file <- getArgs >>= BS.readFile . head
+    file <- getArgs >>= LazyByteString.readFile . head
     let classFile = parseClassFile file
     debugM $ show classFile
     debugM "Initializing Runtime Environment..."
-    env <- VirtualMachine.Environment.init
+    env <- Runtime.Environment.init
     debugM "Loading bootstrap class..."
     loadClass env classFile
     debugM "Starting Virtual Machine..."
-    VirtualMachine.Environment.start env
+    Runtime.Environment.start env

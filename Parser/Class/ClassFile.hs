@@ -4,7 +4,7 @@ module Parser.Class.ClassFile where
   import Data.ByteString.Lazy(ByteString)
 
   -- Imports for parsec
-  import Text.Parsec(parse, ParseError)
+  import Text.Parsec(runParser, ParseError)
 
   -- Imports for helper methods
   import Parser.Class.Helpers (Parser, getWord16, getWord16i, getWord32)
@@ -36,7 +36,7 @@ module Parser.Class.ClassFile where
 
   -- Parses a '.class' file into it's runtime equivalent.
   parseClassFile :: String -> ByteString -> Either ParseError ClassFile
-  parseClassFile = parse parseClassFile'
+  parseClassFile = runParser parseClassFile' False
 
   parseClassFile' :: Parser ClassFile
   parseClassFile' = do
