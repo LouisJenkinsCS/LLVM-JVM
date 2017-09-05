@@ -1,10 +1,30 @@
 module Runtime.Core.Environment where
+  import Runtime.Core.Frame
+  import Runtime.Core.Stack
+
   import Control.Monad.Trans.Class
   import Control.Monad
+  import Control.Monad.Reader
 
   {-
     The Runtime Environment for the JVM, which encompasses all state.
   -}
+
+  {-
+    Types
+  -}
+
+  data Environment = Environment {
+    -- TODO
+  }
+
+  -- The runtime state.
+  type Runtime = ReaderT Environment IO
+
+  -- Convenience typeclass to allow easy access...
+  class (Monad m) => RuntimeEnvironment m where
+    currentFrame :: m Frame
+    stackFrame :: m Stack
 
   -- Below is an example using a MonadTransformer. The below will be changed into
   -- and full-blown Environment soon; it is planned to wrap the IO monad at least.
@@ -40,8 +60,3 @@ module Runtime.Core.Environment where
 
   fn :: MaybeT IO Int
   fn = return 1
-
-  main :: IO ()
-  main = do
-    x <- runMaybeT fn
-    print x
