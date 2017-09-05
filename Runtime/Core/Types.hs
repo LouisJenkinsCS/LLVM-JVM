@@ -8,6 +8,7 @@ module Runtime.Core.Types where
   import Data.IORef
   import Data.Array.IO
 
+  import Parser.Class.ClassFile (ClassFile, parseClassFile)
 
   type Variable = Int
   type Stack = IOUArray Int Frame
@@ -22,6 +23,11 @@ module Runtime.Core.Types where
 
   data Environment = Environment {
     -- TODO
+  }
+
+  data ClassLoader = ClassLoader {
+    -- We manage all class file instances here...
+
   }
 
   -- The runtime state.

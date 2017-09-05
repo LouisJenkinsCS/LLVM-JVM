@@ -15,7 +15,10 @@ module Parser.Class.ClassFile where
   import Control.Monad (replicateM)
 
   {-
-    Types
+    TODO
+
+      Need to add more helper methods, one for every conceiveable use-case. Some
+      examples could be:
   -}
 
   -- Parsed representation of a '.class' file.
@@ -62,3 +65,28 @@ module Parser.Class.ClassFile where
 
     -- Construct our class file
     return $ ClassFile _constantPool _interfaces _fields _methods _attributes
+
+
+  -- Get an interface we implement by index.
+  getInterfaceByIndex :: (Integral a) => a -> ClassFile
+  getInterfaceByIndex = undefined
+
+  -- Get an interface we implement by name
+  getInterfaceByName :: String -> ClassFile
+  getInterfaceByName = undefined
+
+  -- Get a field by name
+  getFieldByName :: String -> Field
+  getFieldByName = undefined
+
+  -- Get a field by index
+  getFieldByIndex :: (Integral a) => a -> Field
+  getFieldByIndex = undefined
+
+  -- Get a method by name
+  getMethodByName :: String -> Method
+  getMethodByName = undefined
+
+  -- Get a method by index
+  getMethodByIndex :: (Integral a) => a -> Method
+  getMethodByIndex = undefined
