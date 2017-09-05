@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 module Runtime.Core.Types where
   import Control.Monad
   import Control.Monad.Reader
@@ -15,6 +16,7 @@ module Runtime.Core.Types where
   data Frame = Frame {
     variables :: IOUArray Int Variable,
     operands :: IOUArray Int Variable,
+    operandTop :: IORef Int,
     pc :: IORef Int
   }
 
@@ -31,3 +33,5 @@ module Runtime.Core.Types where
     stackFrame :: m Stack
 
   instance RuntimeEnvironment Runtime where
+    currentFrame = undefined
+    stackFrame = undefined
