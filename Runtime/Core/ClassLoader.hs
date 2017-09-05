@@ -6,8 +6,3 @@ module Runtime.Core.ClassLoader where
     and managing runtime types. In terms of the JVM, this is considered the 'Bootstrap'
     class loader.
   -}
-
-  data ClassLoader = ClassLoader {
-    -- We manage all class file instances here...
-
-  }
