@@ -14,8 +14,8 @@ module Runtime.Core.Frame where
     frame <- currentFrame
     liftIO $ writeArray (variables frame) (fromIntegral idx) var
 
-  modifyVariable :: Integral a => a -> (Variable -> Variable) -> Runtime ()
-  modifyVariable idx f = do
+  modify :: Integral a => a -> (Variable -> Variable) -> Runtime ()
+  modify idx f = do
     var <- load idx
     store idx (f var)
 
