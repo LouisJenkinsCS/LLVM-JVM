@@ -1,4 +1,6 @@
 module Parser.Class.Helpers where
+  import Parser.Class.Types
+
   -- Imports needed to operate on raw bytes
   import Data.Bits ((.|.), shiftL, Bits)
   import Data.Word (Word8, Word16, Word32, Word64)
@@ -10,13 +12,7 @@ module Parser.Class.Helpers where
   -- Imports needed for parsing (Parsec)
   import Text.Parsec.Prim (tokens, tokenPrim)
   import Text.Parsec.Pos (updatePosChar, updatePosString)
-  import Text.Parsec (Parsec, (<?>), count, anyChar)
-
-  {-
-    Types
-  -}
-
-  type Parser = Parsec ByteString Bool
+  import Text.Parsec ((<?>), count, anyChar)
 
   {-
     Custom Parsec Tokenizers.

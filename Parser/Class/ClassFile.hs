@@ -1,4 +1,6 @@
 module Parser.Class.ClassFile where
+  import Parser.Class.Types
+
   -- Imports for type declarations
   import Data.Word (Word16)
   import Data.ByteString.Lazy(ByteString)
@@ -20,15 +22,6 @@ module Parser.Class.ClassFile where
       Need to add more helper methods, one for every conceiveable use-case. Some
       examples could be:
   -}
-
-  -- Parsed representation of a '.class' file.
-  data ClassFile = ClassFile {
-    constantPool :: [CPConstant],
-    interfaces :: [Word16],
-    fields :: [Field],
-    methods :: [Method],
-    attributes :: [Attribute]
-  } deriving Show
 
   {-
     Parse Functions
