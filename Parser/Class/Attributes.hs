@@ -1,9 +1,8 @@
 module Parser.Class.Attributes where
-  -- Imports for type declarations
-  import Data.Word (Word8, Word16)
-
+  import Parser.Class.Types
+  
   -- Imports for helper methods
-  import Parser.Class.Helpers (Parser, getWord8, getWord16, getWord16i, getWord32i)
+  import Parser.Class.Helpers (getWord8, getWord16, getWord16i, getWord32i)
   import Control.Monad (replicateM)
 
   {-
@@ -19,11 +18,6 @@ module Parser.Class.Attributes where
       easier to use.
   -}
 
-  -- Parser Representation of a '.class' file's attributes.
-  data Attribute = Attribute {
-    attributeNameIndex :: Word16,
-    info :: [Word8]
-  } deriving Show
 
   {-
     Parse functions

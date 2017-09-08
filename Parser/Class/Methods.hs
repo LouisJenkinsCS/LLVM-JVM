@@ -1,23 +1,11 @@
 module Parser.Class.Methods where
-  -- Imports for type declarations
-  import Data.Word (Word16)
+  import Parser.Class.Types
 
   -- Imports for helper methods
-  import Parser.Class.Helpers (Parser, getWord16, getWord16i)
-  import Parser.Class.Attributes (Attribute, parseAttributes)
+  import Parser.Class.Helpers (getWord16, getWord16i)
+  import Parser.Class.Attributes (parseAttributes)
   import Control.Monad (replicateM)
 
-  {-
-    Types
-  -}
-
-  -- Parsed representation of a '.class' file's methods.
-  data Method = Method {
-    accessFlag :: Word16,
-    nameIndex :: Word16,
-    descriptorIndex :: Word16,
-    attributes :: [Attribute]
-  } deriving Show
 
   {-
     Parser Functions
