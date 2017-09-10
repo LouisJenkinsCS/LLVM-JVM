@@ -80,6 +80,7 @@ module Parser.Class.Types where
 
   class (Monad m) => ParserState_ m where
     getConstantPool :: m [CPConstant]
+    setConstantPool :: [CPConstant] -> m ()
     getStatus :: m Int
     setStatus :: Int -> m ()
 
@@ -102,6 +103,11 @@ module Parser.Class.Types where
     getConstantPool = do
       state <- getState
       return $ constantPool (state :: ParserState)
+
+    -- Update constant pool after it gets parsed, so it becomes accessible
+    setConstantPool cpool = do
+      state <- getState
+      putState $ ParserState cpool (status (state :: ParserState))
 
     getStatus = do
       state <- getState

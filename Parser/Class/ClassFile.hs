@@ -9,11 +9,11 @@ module Parser.Class.ClassFile where
   import Text.Parsec(runParser, ParseError)
 
   -- Imports for helper methods
-  import Parser.Class.Helpers (Parser, getWord16, getWord16i, getWord32)
-  import Parser.Class.Constants (CPConstant, parseConstants)
-  import Parser.Class.Fields (Field, parseFields)
-  import Parser.Class.Methods (Method, parseMethods)
-  import Parser.Class.Attributes(Attribute, parseAttributes)
+  import Parser.Class.Helpers (getWord16, getWord16i, getWord32)
+  import Parser.Class.Constants (parseConstants)
+  import Parser.Class.Fields (parseFields)
+  import Parser.Class.Methods (parseMethods)
+  import Parser.Class.Attributes(parseAttributes)
   import Control.Monad (replicateM)
 
   {-
@@ -32,7 +32,7 @@ module Parser.Class.ClassFile where
 
   -- Parses a '.class' file into it's runtime equivalent.
   parseClassFile :: String -> ByteString -> Either ParseError ClassFile
-  parseClassFile = runParser parseClassFile' False
+  parseClassFile = runParser parseClassFile' (ParserState [CPDummy] normal)
 
   parseClassFile' :: Parser ClassFile
   parseClassFile' = do
@@ -44,6 +44,9 @@ module Parser.Class.ClassFile where
 
     -- This is where the constant-pool should begin...
     _constantPool <- parseConstants
+
+    -- Update state with constant pool...
+    setConstantPool _constantPool
 
     -- These are currently ignored...
     _acessFlags <- getWord16
