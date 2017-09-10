@@ -78,3 +78,6 @@ module Parser.Class.Helpers where
 
   getWord64i :: (Integral a) => Parser a
   getWord64i = fromIntegral <$> getWord64
+
+  getConstant :: (Integral a) => a -> Parser CPConstant
+  getConstant idx = (!! fromIntegral idx) <$> getConstantPool
