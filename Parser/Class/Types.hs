@@ -8,12 +8,6 @@ module Parser.Class.Types where
     ClassFile Types
   -}
 
-  -- Parser Representation of a '.class' file's attributes.
-  data Attribute = Attribute {
-    attributeNameIndex :: Word16,
-    info :: [Word8]
-  } deriving Show
-
   -- Parsed representation of a '.class' file's constant-pool constants.
   data CPConstant = CPClass { nameIndex :: Word16 }
     | CPFieldref { classIndex :: Word16, nameAndTypeIndex :: Word16 }
@@ -56,6 +50,24 @@ module Parser.Class.Types where
     methods :: [Method],
     attributes :: [Attribute]
   } deriving Show
+
+  data ExceptionEntry = ExceptionEntry {
+    startPc :: Word16,
+    endPc :: Word16,
+    handlerPc :: Word16,
+    catchType :: Word16
+  } deriving (Show)
+
+  -- Attribute Types
+  data Attribute = UnknownAttribute { attributeName :: String, attributeInfo :: [Word8] }
+    | ConstantValue { constantValueIndex :: Word16 }
+    | CodeAttribute {
+      maxStack :: Word16,
+      maxLocals :: Word16,
+      code :: [Word8],
+      exceptionTable :: [ExceptionEntry],
+      attributes :: [Attribute]
+    } deriving (Show)
 
   {-
     Parsec Types
