@@ -11,6 +11,10 @@ module Runtime.Runtime where
   import Data.Map.Strict
   import Data.Word
 
+  import Unsafe.Coerce
+
+  import GHC.Float
+
   import Runtime.Parser (parseClassFile)
 
 {-------------------------------------------------------------------------------
@@ -57,7 +61,57 @@ module Runtime.Runtime where
 - TODO: Document for Runtime Stack Frame...
 -------------------------------------------------------------------------------}
 
+  -- A variable is a generic 64-bit word that can be coerced by Haskel's compiler
+  -- to the requested type.
   type Variable = Int
+
+  {- Variable Type Conversions -}
+
+  asFloat :: Variable -> Float
+  asFloat = unsafeCoerce
+
+  asLong :: Variable -> Integer
+  asLong = unsafeCoerce
+
+  asInt :: Variable -> Int
+  asInt = unsafeCoerce
+
+  asDouble :: Variable -> Double
+  asDouble = unsafeCoerce
+
+  {- Double Type Conversions -}
+
+  doubleToInt :: Variable -> Int
+  doubleToInt = double2Int . asDouble
+
+  doubleToFloat :: Variable -> Float
+  doubleToFloat = double2Float . asDouble
+
+  doubleToLong :: Variable -> Integer
+  doubleToLong = toInteger . double2Int . asDouble
+
+  {- Float Type Conversions -}
+
+  floatToInt :: Variable -> Int
+  floatToInt = float2Int . asFloat
+
+  floatToDouble :: Variable -> Double
+  floatToDouble = float2Double . asFloat
+
+  floatToLong :: Variable -> Integer
+  floatToLong = toInteger . float2Int . asFloat
+
+  {- Int Type Conversions -}
+
+  intToFloat :: Variable -> Float
+  intToFloat = unsafeCoerce . asInt
+
+  intToDouble :: Variable -> Double
+  intToDouble = unsafeCoerce . asInt
+
+  intToLong :: Variable -> Integer
+  intToLong = toInteger . asInt
+
 
   data Frame = Frame {
     variables :: IOUArray Int Variable,
