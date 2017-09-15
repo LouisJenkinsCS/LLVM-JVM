@@ -65,6 +65,10 @@ module Runtime.Runtime where
   -- to the requested type.
   type Variable = Int
 
+  -- A bytecode instruction is a simple 8-bit word; multiple bytecode can be combined
+  -- to things such as an offset or an index
+  type ByteCode = Int
+
   {- Variable Type Conversions -}
 
   asFloat :: Variable -> Float
@@ -118,7 +122,7 @@ module Runtime.Runtime where
     operands :: IOUArray Int Variable,
     operandTop :: IORef Int,
     pc :: IORef Int,
-    code :: Vector Word8
+    code :: Vector ByteCode
   }
 
   -- Fetch and Modify the program counter
@@ -130,7 +134,7 @@ module Runtime.Runtime where
   incrementPC = flip fetchAndModifyPC (\pc' -> (pc' + 1, pc'))
 
   -- Obtain the next byte code instruction.
-  getInstruction :: Runtime Word8
+  getInstruction :: Runtime ByteCode
   getInstruction = do
     frame <- currentFrame
     idx <- incrementPC frame
@@ -182,6 +186,27 @@ module Runtime.Runtime where
 - TODO: Document for Runtime ClassLoader...
 -------------------------------------------------------------------------------}
 
+  type Type = Int
+
+  -- Types
+  referenceType :: Type
+  referenceType = 1
+
+  intType :: Type
+  intType = 2
+
+  longType :: Type
+  longType = 3
+
+  floatType :: Type
+  floatType = 4
+
+  doubleType :: Type
+  doubleType = 5
+
+  stringType :: Type
+  stringType = 6
+
   data ClassLoader = ClassLoader {
     -- We manage all class file instances here...
   }
@@ -199,12 +224,26 @@ module Runtime.Runtime where
 
   -- Runtime version of parsed Method
   data MethodDescriptor = MethodDescriptor {
-
+    -- Name of method.
+    methodName :: String,
+    -- Return type
+    returnType :: Type,
+    -- Argument types
+    argsType :: [Type],
+    -- Executable code
+    methodCode :: [ByteCode],
+    -- Local variable array size
+    maxLocals :: Int,
+    -- Operand stack size
+    maxOperands :: Int
   }
 
   -- Runtime version of parsed Field
   data FieldDescriptor = FieldDescriptor {
-
+    -- Name of field.
+    fieldName :: String,
+    -- Field type
+    fieldType :: Type
   }
 
   -- Runtime version of parsed Constant
