@@ -162,8 +162,15 @@ module Runtime.Parser where
     _attributes <- parseAttributes
 
     -- Construct our class file
-    return $ ClassFile _thisClass _superClass _constantPool _interfaces
-      _fields _methods _attributes
+    return ClassFile {
+      thisClassIdx = _thisClass,
+      superClassIdx = _superClass,
+      constantPool = _constantPool,
+      interfaces = _interfaces,
+      fields = _fields,
+      methods = _methods,
+      attributes = _attributes
+    }
 
 {-------------------------------------------------------------------------------
 - TODO: Document for ClassFile Attributes...
