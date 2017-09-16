@@ -4,18 +4,23 @@ module Runtime.Runtime where
   import Control.Monad.Trans.Class
   import Control.Monad.IO.Class
 
-  import Data.Vector.Unboxed
+  import Data.Vector.Unboxed (Vector)
   import Data.Maybe
+  import Data.Either
   import Data.IORef
   import Data.Array.IO
-  import Data.Map.Strict
+  import Data.Map.Strict (Map)
   import Data.Word
+
+  import qualified Data.Vector.Unboxed as Vector
+  import qualified Data.Map.Strict as Map
+  import qualified Data.ByteString.Lazy as LazyByteString
 
   import Unsafe.Coerce
 
   import GHC.Float
 
-  import Runtime.Parser (parseClassFile)
+  import Runtime.Parser (parseClassFile, CPConstant, ClassFile)
 
 {-------------------------------------------------------------------------------
 - TODO: Document for Runtime...
@@ -27,6 +32,8 @@ module Runtime.Runtime where
   debugRuntime :: Bool
   debugRuntime = True
 
+  getRuntimeState :: Runtime RuntimeState
+  getRuntimeState = ask
 
   {-
     Ideal Abstraction:
@@ -141,9 +148,9 @@ module Runtime.Runtime where
 
     -- We use bounds checking only when we are debugging
     if debugRuntime then
-      code frame `indexM` fromIntegral idx
+      code frame `Vector.indexM` fromIntegral idx
     else
-      code frame `unsafeIndexM` fromIntegral idx
+      code frame `Vector.unsafeIndexM` fromIntegral idx
 
   load :: Integral a => a -> Runtime Variable
   load idx = do
@@ -179,7 +186,7 @@ module Runtime.Runtime where
 -------------------------------------------------------------------------------}
 
   data RuntimeState = RuntimeState {
-    -- TODO
+    classLoader :: ClassLoader
   }
 
 {-------------------------------------------------------------------------------
@@ -209,18 +216,58 @@ module Runtime.Runtime where
 
   data ClassLoader = ClassLoader {
     -- We manage all class file instances here...
+    classMapping :: IORef (Map String ClassDescriptor)
   }
+
+  getClassLoader :: Runtime ClassLoader
+  getClassLoader = classLoader <$> getRuntimeState
+
+  loadClass :: String -> Runtime ClassDescriptor
+  loadClass className = do
+    loader <- getClassLoader
+    mappings <- liftIO . readIORef $ classMapping loader
+
+    case Map.lookup className mappings of
+        -- Already parsed and cached
+        Just classDesc -> return classDesc
+
+        -- If the class is not present, then we must load it
+        Nothing -> do
+          classFile <- getClassFile
+          classDesc <- parseClass classFile
+          liftIO . writeIORef (classMapping loader) $ Map.insert className classDesc mappings
+          return classDesc
+          where
+            -- Loads classfile and parses it
+            getClassFile :: Runtime ClassFile
+            getClassFile = do
+              -- Attempt to locate the class file first...
+              classContents <- liftIO $ LazyByteString.readFile className
+              let maybeClassFile = parseClassFile className classContents
+              let classFile = either
+                              -- ParseError: Print error message (and quit)
+                              (error . show)
+                              -- ClassFile: Return it
+                              id
+                              -- Result from parse
+                              maybeClassFile
+              return classFile
+
+            -- Converts parsed class file to runtime descriptor
+            parseClass :: ClassFile -> Runtime ClassDescriptor
+            parseClass = undefined
+
+  -- Obtains a constant from the constant pool
+  getConstant :: (Integral a) => a -> Runtime Variable
+  getConstant = undefined
 
   -- Runtime version of parsed Class
   data ClassDescriptor = ClassDescriptor {
     className :: String,
     methodMapping :: Map String MethodDescriptor,
-    fieldMapping :: Map String FieldDescriptor
+    fieldMapping :: Map String FieldDescriptor,
+    constantPool :: Vector CPConstant
   }
-
-  -- Obtains a constant from the constant pool
-  getConstant :: (Integral a) => a -> m ConstantDescriptor
-  getConstant = undefined
 
   -- Runtime version of parsed Method
   data MethodDescriptor = MethodDescriptor {
@@ -244,9 +291,4 @@ module Runtime.Runtime where
     fieldName :: String,
     -- Field type
     fieldType :: Type
-  }
-
-  -- Runtime version of parsed Constant
-  data ConstantDescriptor = ConstantDescriptor {
-
   }
