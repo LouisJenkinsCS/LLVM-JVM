@@ -8,6 +8,7 @@ module Runtime.Parser where
   import Data.Bits
   import Data.ByteString.Internal (c2w)
   import Data.ByteString.Lazy (ByteString)
+  import qualified Data.Bifunctor as BiFunctor
   import qualified Data.ByteString.Lazy as LazyByteString
   import qualified Data.ByteString.Lazy.Char8 as Char8
 
@@ -84,7 +85,7 @@ module Runtime.Parser where
   -- Parsed representation of a '.class' file's fields.
   data Field = Field {
     accessFlags :: Word16,
-    nameIndex :: Word16,
+    fieldNameIndex :: Word16,
     descriptorIndex :: Word16,
     attributes :: [Attribute]
   } deriving Show
@@ -102,7 +103,7 @@ module Runtime.Parser where
   -- Parsed representation of a '.class' file's methods.
   data Method = Method {
     accessFlag :: Word16,
-    nameIndex :: Word16,
+    methodNameIndex :: Word16,
     descriptorIndex :: Word16,
     attributes :: [Attribute]
   } deriving Show
@@ -119,6 +120,8 @@ module Runtime.Parser where
 
   -- Parsed representation of a '.class' file.
   data ClassFile = ClassFile {
+    thisClassIdx :: Int,
+    superClassIdx :: Int,
     constantPool :: [CPConstant],
     interfaces :: [Word16],
     fields :: [Field],
@@ -131,7 +134,7 @@ module Runtime.Parser where
 
   -- Parses a '.class' file into it's runtime equivalent.
   parseClassFile :: String -> ByteString -> Either ParseError ClassFile
-  parseClassFile = runParser parseClassFile' (ParserState [CPDummy] normal)
+  parseClassFile = runParser parseClassFile' (normal, [])
 
   parseClassFile' :: Parser ClassFile
   parseClassFile' = do
@@ -149,8 +152,8 @@ module Runtime.Parser where
 
     -- These are currently ignored...
     _acessFlags <- getWord16
-    _thisClass <- getWord16
-    _superClass <- getWord16
+    _thisClass <- getWord16i
+    _superClass <- getWord16i
 
     -- Now we have more dynamic fields: Interfaces, Fields, Methods, and Attributes.
     _interfaces <- parseInterfaces
@@ -159,7 +162,8 @@ module Runtime.Parser where
     _attributes <- parseAttributes
 
     -- Construct our class file
-    return $ ClassFile _constantPool _interfaces _fields _methods _attributes
+    return $ ClassFile _thisClass _superClass _constantPool _interfaces
+      _fields _methods _attributes
 
 {-------------------------------------------------------------------------------
 - TODO: Document for ClassFile Attributes...
@@ -216,13 +220,8 @@ module Runtime.Parser where
       -- Not supported yet...
       _ -> UnknownAttribute name <$> replicateM len getWord8
 
-  -- The state carried forward through parsing.
-  data ParserState = ParserState {
-    -- The Constant Pool.
-    constantPool :: [CPConstant],
-    -- Current state encoded as a number.
-    status :: Int
-  }
+  -- The state carried forward through parsing. Couples both the state and constant pool
+  type ParserState = (Int, [CPConstant])
 
   -- Constant statuses...
   skip :: Int
@@ -232,26 +231,18 @@ module Runtime.Parser where
   normal = 0
 
   getConstantPool :: Parser [CPConstant]
-  getConstantPool = do
-    state <- getState
-    return $ constantPool (state :: ParserState)
+  getConstantPool = snd <$> getState
 
   -- Update constant pool after it gets parsed, so it becomes accessible
   setConstantPool :: [CPConstant] -> Parser ()
-  setConstantPool cpool = do
-    state <- getState
-    putState $ ParserState cpool (status (state :: ParserState))
+  setConstantPool cp = getState >>= putState . BiFunctor.second (const cp)
 
   getStatus :: Parser Int
-  getStatus = do
-    state <- getState
-    return $ status (state :: ParserState)
+  getStatus = fst <$> getState
 
   -- Update status, but carry the constant pool forward.
   setStatus :: Int -> Parser ()
-  setStatus newStatus = do
-    state <- getState
-    putState $ ParserState (constantPool (state :: ParserState)) newStatus
+  setStatus s = getState >>= putState . BiFunctor.first (const s)
 
 {-------------------------------------------------------------------------------
 - TODO: Document for Parsing...
