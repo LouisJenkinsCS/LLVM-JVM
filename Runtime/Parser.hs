@@ -216,13 +216,6 @@ module Runtime.Parser where
       -- Not supported yet...
       _ -> UnknownAttribute name <$> replicateM len getWord8
 
-
-  class (Monad m) => ParserState_ m where
-    getConstantPool :: m [CPConstant]
-    setConstantPool :: [CPConstant] -> m ()
-    getStatus :: m Int
-    setStatus :: Int -> m ()
-
   -- The state carried forward through parsing.
   data ParserState = ParserState {
     -- The Constant Pool.
@@ -238,24 +231,27 @@ module Runtime.Parser where
   normal :: Int
   normal = 0
 
-  instance ParserState_ Parser where
-    getConstantPool = do
-      state <- getState
-      return $ constantPool (state :: ParserState)
+  getConstantPool :: Parser [CPConstant]
+  getConstantPool = do
+    state <- getState
+    return $ constantPool (state :: ParserState)
 
-    -- Update constant pool after it gets parsed, so it becomes accessible
-    setConstantPool cpool = do
-      state <- getState
-      putState $ ParserState cpool (status (state :: ParserState))
+  -- Update constant pool after it gets parsed, so it becomes accessible
+  setConstantPool :: [CPConstant] -> Parser ()
+  setConstantPool cpool = do
+    state <- getState
+    putState $ ParserState cpool (status (state :: ParserState))
 
-    getStatus = do
-      state <- getState
-      return $ status (state :: ParserState)
+  getStatus :: Parser Int
+  getStatus = do
+    state <- getState
+    return $ status (state :: ParserState)
 
-    -- Update status, but carry the constant pool forward.
-    setStatus newStatus = do
-      state <- getState
-      putState $ ParserState (constantPool (state :: ParserState)) newStatus
+  -- Update status, but carry the constant pool forward.
+  setStatus :: Int -> Parser ()
+  setStatus newStatus = do
+    state <- getState
+    putState $ ParserState (constantPool (state :: ParserState)) newStatus
 
 {-------------------------------------------------------------------------------
 - TODO: Document for Parsing...
