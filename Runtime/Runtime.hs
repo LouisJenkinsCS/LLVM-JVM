@@ -12,15 +12,19 @@ module Runtime.Runtime where
   import Data.Map.Strict (Map)
   import Data.Word
 
-  import qualified Data.Vector.Unboxed as Vector
+  import qualified Data.Vector.Unboxed as UnboxedVector
+  import qualified Data.Vector as BoxedVector
   import qualified Data.Map.Strict as Map
   import qualified Data.ByteString.Lazy as LazyByteString
+  import qualified Runtime.Parser as Parser
 
   import Unsafe.Coerce
 
   import GHC.Float
 
   import Runtime.Parser (parseClassFile, CPConstant, ClassFile)
+  import qualified Runtime.Parser as Parser
+
 
 {-------------------------------------------------------------------------------
 - TODO: Document for Runtime...
@@ -148,9 +152,9 @@ module Runtime.Runtime where
 
     -- We use bounds checking only when we are debugging
     if debugRuntime then
-      code frame `Vector.indexM` fromIntegral idx
+      code frame `UnboxedVector.indexM` fromIntegral idx
     else
-      code frame `Vector.unsafeIndexM` fromIntegral idx
+      code frame `UnboxedVector.unsafeIndexM` fromIntegral idx
 
   load :: Integral a => a -> Runtime Variable
   load idx = do
@@ -255,7 +259,18 @@ module Runtime.Runtime where
 
             -- Converts parsed class file to runtime descriptor
             parseClass :: ClassFile -> Runtime ClassDescriptor
-            parseClass = undefined
+            parseClass classFile = do
+              -- The class name must be obtained directly from the constant pool
+              let cpool = BoxedVector.fromList $ Parser.constantPool classFile
+              let
+                  -- Obtain `nameIndex` field from CPClass
+                  cpclass = cpool `BoxedVector.unsafeIndex` Parser.thisClassIdx classFile
+                  -- Obtain 'utf8Bytes' field from CPUtf8
+                  cputf8 = cpool `BoxedVector.unsafeIndex` (fromIntegral . Parser.nameIndex) cpclass
+                  -- Convert raw UTF8 Bytes into a String
+                  className' = map (toEnum . fromEnum) (Parser.utf8Bytes cputf8)
+
+              return ClassDescriptor {className = className'}
 
   -- Obtains a constant from the constant pool
   getConstant :: (Integral a) => a -> Runtime Variable
@@ -266,7 +281,7 @@ module Runtime.Runtime where
     className :: String,
     methodMapping :: Map String MethodDescriptor,
     fieldMapping :: Map String FieldDescriptor,
-    constantPool :: Vector CPConstant
+    runtimeConstants :: BoxedVector.Vector CPConstant
   }
 
   -- Runtime version of parsed Method
