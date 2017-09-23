@@ -387,7 +387,7 @@ readClassFile path' = readIORef classPaths >>= rcf
   where
     path = replace "." "/" path'
     rcf :: [MClassPath] -> IO (Class Direct)
-    rcf [] = error $ "readClassFile: Class \"" ++ show path ++ "\" not found."
+    rcf [] = readIORef classPaths >>= \cp -> error $ "readClassFile: Class \"" ++ show path ++ "\" not found." ++ "\n" ++ show cp
     rcf (Directory pre:xs) = do
       let cf = pre ++ path ++ ".class"
       printfCp $ printf "rcf: searching @ %s for %s\n" (show pre) (show path)
@@ -406,6 +406,7 @@ readClassFile path' = readIORef classPaths >>= rcf
 data MClassPath =
   Directory String |
   JAR [Tree CPEntry]
+  deriving (Show)
 
 classPaths :: IORef [MClassPath]
 {-# NOINLINE classPaths #-}

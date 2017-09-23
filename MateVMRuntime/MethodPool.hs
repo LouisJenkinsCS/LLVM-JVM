@@ -76,7 +76,9 @@ insertCompiledMethod entry (MethodInfo mmname _ msig) clsnames = do
   setMethodMap $ mmap `M.union` newmap
 
 -- Stubbed for now...
-compileMethod = undefined
+-- TODO: Do LLVM
+compileMethod name sig cls = error $ "JIT Compilation not implemented...\n"
+  ++ "Method Name: " ++ show name ++ ", Signature: " ++ show sig
 
 compile :: MethodInfo -> IO NativeWord
 compile methodinfo = time (printf "compile \"%s\"" $ toString $ methName methodinfo) $ do

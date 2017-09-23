@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Rebuild 'Main' in case it has been changed...
-ghc Main.hs
+ghc Main.hs -o Main.exe
 if [ $? -eq 0 ]; then
   echo Main.exe Rebuilt
 else
@@ -18,10 +18,13 @@ for d in */; do
   echo "cd $d"
 
   # We only search for files with the 'java' extension
+  # Note that currently we can only run Java 7 '.class'
+  # files, so we must cross-compile it...
   for f in *.java; do
     filename=$(basename "${f%.*}")
-    javac $f
-    ../../Main.exe "$filename.class" 1> tmp.out 2> tmp.err
+    bootstrap=$(locate -r '/rt.jar$')
+    javac -target 1.7 -source 1.7 -bootclasspath $bootstrap $f
+    ../../Main.exe -cp ../../rt:./ "$filename" 1> tmp.out 2> tmp.err
 
     # Check if program completed successfully...
     if [ $? -eq 0 ]; then
