@@ -9,11 +9,13 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.ByteString.Lazy as B
 import Data.Binary
+import Data.Maybe (fromJust)
 
 import Foreign
 import Foreign.C.Types
 
 import JVM.ClassFile
+import JVM.Assembler
 
 import MateVMRuntime.Debug
 import MateVMRuntime.Types
@@ -22,6 +24,8 @@ import MateVMRuntime.NativeSizes
 import MateVMRuntime.Utilities
 import MateVMRuntime.ClassPool
 import MateVMRuntime.NativeMethods
+
+import LLVMFrontend.CFG
 
 foreign import ccall "dynamic"
    code_void :: FunPtr (IO ()) -> IO ()
@@ -77,8 +81,13 @@ insertCompiledMethod entry (MethodInfo mmname _ msig) clsnames = do
 
 -- Stubbed for now...
 -- TODO: Do LLVM
-compileMethod name sig cls = error $ "JIT Compilation not implemented...\n"
-  ++ "Method Name: " ++ show name ++ ", Signature: " ++ show sig
+compileMethod :: B.ByteString -> MethodSignature -> Class Direct -> IO (a,b)
+compileMethod name sig cls = do
+  let meth = fromJust $ lookupMethod name cls
+  let code = M.fromList (arlist (methodAttributes meth)) M.! "Code"
+  cfg <- parseCFG (decodeMethod code)
+
+  error $ "JIT Compilation not implemented...\n" ++ "arMap: " ++ show (currentBlock cfg)
 
 compile :: MethodInfo -> IO NativeWord
 compile methodinfo = time (printf "compile \"%s\"" $ toString $ methName methodinfo) $ do

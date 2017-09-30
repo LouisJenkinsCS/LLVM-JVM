@@ -12,6 +12,8 @@ module Main where
   import qualified Data.ByteString.Lazy.Char8 as C8
   import Control.Monad
 
+  import LLVMFrontend.CFG
+
   import MateVMRuntime.ClassPool
   import MateVMRuntime.MethodPool
 
