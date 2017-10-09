@@ -16,6 +16,7 @@ module LLVMFrontend.CFG where
   import qualified LLVM.AST.Operand as LO
   import qualified LLVM.AST.Name as LN
   import qualified LLVM.AST.Type as LT
+  import LLVMFrontend.Helpers
 
   -- Control-Flow Graph state
   data CFGState = CFGState {
@@ -32,7 +33,7 @@ module LLVMFrontend.CFG where
   parseCFG code = execStateT parseInstructions defaultCFGState
     where
       defaultCFGState = CFGState {
-        basicBlocks = [],
+        basicBlocks = [LG.BasicBlock (LN.UnName 1) [] retvoid],
         programCounter = 0,
         instructions = Vec.fromList (J.codeInstructions code),
         codeMetaData = code

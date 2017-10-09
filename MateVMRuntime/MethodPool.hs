@@ -7,6 +7,7 @@ module MateVMRuntime.MethodPool
 
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy as B
 import Data.Binary
 import Data.Maybe (fromJust)
@@ -33,6 +34,7 @@ import LLVM.CodeModel
 import LLVM.Target
 import qualified LLVM.Module as Mod
 import LLVM.PassManager
+import LLVMFrontend.Helpers
 
 foreign import ccall "dynamic"
    code_void :: FunPtr (IO ()) -> IO ()
@@ -97,6 +99,8 @@ compileMethod name sig cls = do
   let meth = fromJust $ lookupMethod name cls
   let code = M.fromList (arlist (methodAttributes meth)) M.! "Code"
   cfg <- parseCFG (decodeMethod code)
+  let mod = AST.defaultModule { AST.moduleDefinitions = [defineFn "main" (basicBlocks cfg)], AST.moduleName = "Dummy" }
+  compileMethod' mod
 
   error $ "JIT Compilation not implemented...\n" ++ "arMap: " ++ show (basicBlocks cfg)
 
@@ -111,6 +115,7 @@ compileMethod' mod =
         withPassManager defaultCuratedPassSetSpec { optLevel = Just 3 } $ \pm -> do
           optmod <- Mod.moduleAST m -- Optimized-copy of module
           s <- Mod.moduleLLVMAssembly m -- Convert from module to assembly
+          error $ C8.unpack s
 
           -- Actually execute module... execution engine is modified to contain the
           -- actual code...
