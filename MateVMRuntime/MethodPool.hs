@@ -27,6 +27,12 @@ import MateVMRuntime.NativeMethods
 
 import LLVMFrontend.CFG
 import qualified LLVM.AST as AST
+import qualified LLVM.ExecutionEngine as EE
+import LLVM.Context
+import LLVM.CodeModel
+import LLVM.Target
+import qualified LLVM.Module as Mod
+import LLVM.PassManager
 
 foreign import ccall "dynamic"
    code_void :: FunPtr (IO ()) -> IO ()
@@ -93,6 +99,32 @@ compileMethod name sig cls = do
   cfg <- parseCFG (decodeMethod code)
 
   error $ "JIT Compilation not implemented...\n" ++ "arMap: " ++ show (basicBlocks cfg)
+
+compileMethod' mod =
+  -- Create a context used within this scope, which contains all LLVM-specific information
+  withContext $ \c ->
+    -- Create an execution engine within this scope...
+    EE.withMCJIT c (Just 0) Nothing Nothing Nothing $ \ee ->
+      -- Create an LLVM module from the AST generated...
+      Mod.withModuleFromAST c mod $ \m ->
+        -- Make a simple optimization pass
+        withPassManager defaultCuratedPassSetSpec { optLevel = Just 3 } $ \pm -> do
+          optmod <- Mod.moduleAST m -- Optimized-copy of module
+          s <- Mod.moduleLLVMAssembly m -- Convert from module to assembly
+
+          -- Actually execute module... execution engine is modified to contain the
+          -- actual code...
+          EE.withModuleInEngine ee m $ \ee' -> do
+            -- Find and execute main method...
+            mainfn <- EE.getFunction ee' "main"
+            case mainfn of
+              Just fn -> do
+                result <- code_void (castFunPtr fn :: FunPtr (IO ()))
+                putStrLn $ "Evaluated to: " ++ show result
+              Nothing -> return ()
+
+          -- Optimized module used only in next pass...
+          return optmod
 
 compile :: MethodInfo -> IO NativeWord
 compile methodinfo = time (printf "compile \"%s\"" $ toString $ methName methodinfo) $ do
