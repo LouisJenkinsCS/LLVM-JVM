@@ -26,6 +26,7 @@ import MateVMRuntime.ClassPool
 import MateVMRuntime.NativeMethods
 
 import LLVMFrontend.CFG
+import qualified LLVM.AST as AST
 
 foreign import ccall "dynamic"
    code_void :: FunPtr (IO ()) -> IO ()
@@ -79,6 +80,10 @@ insertCompiledMethod entry (MethodInfo mmname _ msig) clsnames = do
                   clsnames
   setMethodMap $ mmap `M.union` newmap
 
+-- Create dummy module to be invoked by JIT
+initModule :: AST.Module
+initModule = AST.defaultModule { AST.moduleName = "dummy" }
+
 -- Stubbed for now...
 -- TODO: Do LLVM
 compileMethod :: B.ByteString -> MethodSignature -> Class Direct -> IO (a,b)
@@ -87,7 +92,7 @@ compileMethod name sig cls = do
   let code = M.fromList (arlist (methodAttributes meth)) M.! "Code"
   cfg <- parseCFG (decodeMethod code)
 
-  error $ "JIT Compilation not implemented...\n" ++ "arMap: " ++ show (currentBlock cfg)
+  error $ "JIT Compilation not implemented...\n" ++ "arMap: " ++ show (basicBlocks cfg)
 
 compile :: MethodInfo -> IO NativeWord
 compile methodinfo = time (printf "compile \"%s\"" $ toString $ methName methodinfo) $ do
