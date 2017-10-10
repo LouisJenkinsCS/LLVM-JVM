@@ -23,12 +23,17 @@ module LLVMFrontend.CFG where
     basicBlocks :: [LG.BasicBlock],
     programCounter :: Int,
     instructions :: Vector J.Instruction,
-    codeMetaData :: J.Code
+    codeMetaData :: J.Code,
+    operandStack :: [LO.Operand],
+    localVariableNames :: [LN.Name],
+    -- Monotonic counter for unnamed temporaries
+    autotmpN :: Int
   } deriving (Show)
   -- makeLenses ''CFGState
 
   type CFG = StateT CFGState IO
 
+  -- Parse a JVM method into an LLVM module
   parseCFG :: J.Code -> IO CFGState
   parseCFG code = execStateT parseInstructions defaultCFGState
     where
@@ -36,9 +41,49 @@ module LLVMFrontend.CFG where
         basicBlocks = [LG.BasicBlock (LN.UnName 1) [] retvoid],
         programCounter = 0,
         instructions = Vec.fromList (J.codeInstructions code),
-        codeMetaData = code
+        codeMetaData = code,
+        autotmpN = 1,
+        operandStack = [],
+        localVariableNames = []
       }
 
+  -- Get next numeric identifier for a new temporary
+  nextTemp :: Integral a => CFG a
+  nextTemp = do
+    curr <- gets autotmpN
+    modify $ \s -> s { autotmpN = curr + 1 }
+    return . fromIntegral $ curr
+
+  -- Pushes a constant on the operand stack.
+  pushConstant :: LC.Constant -> CFG ()
+  pushConstant cons =
+    -- An LLVM constant must be first converted into a ConstantOperand
+    pushOperand $ LO.ConstantOperand cons
+
+  -- Pushes an operand on the operand stack.
+  pushOperand :: LO.Operand -> CFG ()
+  pushOperand op = do
+    ops <- gets operandStack
+    modify $ \s -> s { operandStack = op : ops }
+
+  -- Pops a constant off the operand stack...
+  -- Note that the caller must know the type of the actual operand
+  popOperand :: CFG LO.Operand
+  popOperand = do
+    ops <- gets operandStack
+    let op = head ops
+    modify $ \s -> s { operandStack = tail ops }
+    return op
+
+  -- Generate a named local variable name for each possible local variable
+  setupLocals :: CFG ()
+  setupLocals = do
+    -- For each maximum locals, generate a name for it in advance
+    maxLocals <- J.codeMaxLocals <$> gets codeMetaData
+    names <- forM [1..maxLocals] $ \i -> return $ LN.mkName ("L" ++ show i)
+    modify $ \s -> s { localVariableNames = names }
+
+  -- Parse JVM Bytecode instructions into LLVM IR instructions
   parseInstructions :: CFG ()
   parseInstructions = do
     -- Fetch and Add to program counter.
@@ -47,10 +92,28 @@ module LLVMFrontend.CFG where
 
     -- Decode instructions.
     -- TODO: In future, check type of instruction and go from there...
-    instrs <- (: []) . (Vec.! pc) <$> gets instructions
+    instr <- (Vec.! pc) <$> gets instructions
+    case instr of
+      -- Constants are pushed directly on operand stack
+      J.ICONST_0 -> pushConstant $ int 0
+      J.ICONST_1 -> pushConstant $ int 1
+      J.ICONST_2 -> pushConstant $ int 2
+      J.ICONST_3 -> pushConstant $ int 3
+      J.ICONST_4 -> pushConstant $ int 4
+      J.ICONST_5 -> pushConstant $ int 5
+      J.ICONST_M1 -> pushConstant $ int (-1)
+
+      -- Binary operations operate and utilize the operand stack to simulate the
+      -- stack-machine nature of the JVM on the LLVM.
+      J.IADD -> do
+        -- Map a JVM-Bytecode addition instruction to an LLVM addition instruction
+        llvmInstr <- add <$> popOperand <*> popOperand
+        tmpName <- LN.UnName <$> nextTemp
+        pushOperand $ LO.LocalReference LT.i32 tmpName
 
     -- Append to our current block...
     block <- head <$> gets basicBlocks
+
 
     unlessM outOfInstructions parseInstructions
 
