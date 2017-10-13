@@ -99,7 +99,7 @@ compileMethod name sig cls = do
   let meth = fromJust $ lookupMethod name cls
   let code = M.fromList (arlist (methodAttributes meth)) M.! "Code"
   cfg <- parseCFG (decodeMethod code)
-  let mod = AST.defaultModule { AST.moduleDefinitions = [defineFn (AST.IntegerType 32) "main" (basicBlocks cfg)], AST.moduleName = "Dummy" }
+  let mod = AST.defaultModule { AST.moduleDefinitions = [defineFn AST.VoidType "main" (basicBlocks cfg)], AST.moduleName = "Dummy" }
   compileMethod' mod
 
   error $ "JIT Compilation not implemented...\n" ++ "arMap: " ++ show (basicBlocks cfg)

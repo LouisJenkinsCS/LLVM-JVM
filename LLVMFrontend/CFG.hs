@@ -109,7 +109,7 @@ module LLVMFrontend.CFG where
   setupLocals = do
     -- For each maximum locals, generate a name for it in advance
     maxLocals <- J.codeMaxLocals <$> gets codeMetaData
-    names <- forM [0..maxLocals] $ \i -> do
+    names <- forM [0..maxLocals-1] $ \i -> do
       let name = LN.mkName ("L" ++ show i)
       appendInstruction $ name LI.:= alloca LT.i32
       return name
@@ -119,9 +119,14 @@ module LLVMFrontend.CFG where
   getLocal :: Integral a => a -> CFG LN.Name
   getLocal idx = (!! fromIntegral idx) <$> gets localVariableNames
 
-  -- Parse JVM Bytecode instructions into LLVM IR instructions
   parseInstructions :: CFG ()
   parseInstructions = do
+    setupLocals
+    parseInstructions'
+
+  -- Parse JVM Bytecode instructions into LLVM IR instructions
+  parseInstructions' :: CFG ()
+  parseInstructions' = do
     -- Fetch and Add to program counter.
     pc <- gets programCounter
     modify $ \s -> s { programCounter = pc + 1 }
@@ -139,12 +144,12 @@ module LLVMFrontend.CFG where
       J.ICONST_5 -> pushConstant $ int 5
       J.ICONST_M1 -> pushConstant $ int (-1)
 
-      -- Loads/Stores are assigned directly via Alloca
+      -- Loads/Stores are assigned directly via Alloca.
+      -- The index of the local variable normally is the next byte, but the
+      -- 'hs-java' library is gracious enough to provide us with a helper that
+      -- tags the next byte along with it.
       -- TODO: Need SSA conversions
       J.ISTORE_ idx -> do
-        -- The index of the local variable normally is the next byte, but the
-        -- 'hs-java' library is gracious enough to provide us with a helper that
-        -- tags the next byte along with it.
         localName <- getLocal $
           case idx of
             J.I0 -> 0
@@ -154,6 +159,17 @@ module LLVMFrontend.CFG where
 
         storeInstr <- store (local LT.i32 localName) <$> popOperand
         appendInstruction (LI.Do storeInstr)
+      J.ILOAD_ idx -> do
+        localName <- getLocal $
+          case idx of
+            J.I0 -> 0
+            J.I1 -> 1
+            J.I2 -> 2
+            J.I3 -> 3
+
+        tmpName <- LN.UnName <$> nextTemp
+        appendInstruction $ tmpName LI.:= load (local LT.i32 localName)
+        pushOperand $ LO.LocalReference LT.i32 tmpName
 
       -- Binary operations operate and utilize the operand stack to simulate the
       -- stack-machine nature of the JVM on the LLVM.
@@ -170,10 +186,10 @@ module LLVMFrontend.CFG where
         setTerminator retInstr
       _ -> return ()
 
-    whenM outOfInstructions $ do
-      retInstr <- ret <$> popOperand
-      setTerminator retInstr
-    unlessM outOfInstructions parseInstructions
+    -- whenM outOfInstructions $ do
+    --   retInstr <- ret <$> popOperand
+    --   setTerminator retInstr
+    unlessM outOfInstructions parseInstructions'
 
     where
       outOfInstructions :: CFG Bool
