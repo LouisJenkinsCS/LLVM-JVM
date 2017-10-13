@@ -24,11 +24,11 @@ module LLVMFrontend.Helpers where
     deriving (Functor, Applicative, Monad, MonadState AST.Module)
 
   -- Creates a simple function which returns void and takes no arguments
-  defineFn :: ShortByteString -> [BasicBlock] -> Definition
-  defineFn label body =
+  defineFn :: LT.Type -> ShortByteString -> [BasicBlock] -> Definition
+  defineFn typ label body =
     GlobalDefinition $ functionDefaults {
       name = Name label,
-      returnType = VoidType,
+      returnType = typ,
       basicBlocks = body
     }
 

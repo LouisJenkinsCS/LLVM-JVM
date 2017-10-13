@@ -99,7 +99,7 @@ compileMethod name sig cls = do
   let meth = fromJust $ lookupMethod name cls
   let code = M.fromList (arlist (methodAttributes meth)) M.! "Code"
   cfg <- parseCFG (decodeMethod code)
-  let mod = AST.defaultModule { AST.moduleDefinitions = [defineFn "main" (basicBlocks cfg)], AST.moduleName = "Dummy" }
+  let mod = AST.defaultModule { AST.moduleDefinitions = [defineFn (AST.IntegerType 32) "main" (basicBlocks cfg)], AST.moduleName = "Dummy" }
   compileMethod' mod
 
   error $ "JIT Compilation not implemented...\n" ++ "arMap: " ++ show (basicBlocks cfg)
@@ -112,7 +112,7 @@ compileMethod' mod =
       -- Create an LLVM module from the AST generated...
       Mod.withModuleFromAST c mod $ \m ->
         -- Make a simple optimization pass
-        withPassManager defaultCuratedPassSetSpec { optLevel = Just 3 } $ \pm -> do
+        withPassManager defaultCuratedPassSetSpec { optLevel = Nothing } $ \pm -> do
           optmod <- Mod.moduleAST m -- Optimized-copy of module
           s <- Mod.moduleLLVMAssembly m -- Convert from module to assembly
           error $ C8.unpack s

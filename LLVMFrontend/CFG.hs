@@ -1,4 +1,5 @@
 -- {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module LLVMFrontend.CFG where
   import Control.Monad.State
   import Control.Lens
@@ -38,11 +39,11 @@ module LLVMFrontend.CFG where
   parseCFG code = execStateT parseInstructions defaultCFGState
     where
       defaultCFGState = CFGState {
-        basicBlocks = [LG.BasicBlock (LN.UnName 1) [] retvoid],
+        basicBlocks = [LG.BasicBlock (LN.Name "entry") [] retvoid],
         programCounter = 0,
         instructions = Vec.fromList (J.codeInstructions code),
         codeMetaData = code,
-        autotmpN = 1,
+        autotmpN = 2,
         operandStack = [],
         localVariableNames = []
       }
@@ -75,13 +76,48 @@ module LLVMFrontend.CFG where
     modify $ \s -> s { operandStack = tail ops }
     return op
 
+  updateCurrentBlock :: LG.BasicBlock -> CFG ()
+  updateCurrentBlock b = do
+    blocks <- gets basicBlocks
+    modify $ \s -> s { basicBlocks = b : tail blocks }
+
+  -- Sets the current terminator of this basic block. The terminator is an terminal
+  -- operation (I.E one that is the very last instruction to be called) and generally
+  -- results in branching of control flow or a return statement
+  setTerminator :: LI.Named LI.Terminator -> CFG ()
+  setTerminator term = do
+    block <- head <$> gets basicBlocks
+    updateCurrentBlock $ setTerminator' term block
+
+    where
+      setTerminator' term (LG.BasicBlock n i t) = LG.BasicBlock n i term
+
+
+  -- Appends an instruction to the specified basic block by creating a copy containing
+  -- the requested instruction.
+  appendInstruction :: LI.Named LI.Instruction -> CFG ()
+  appendInstruction instr = do
+    block <- head <$> gets basicBlocks
+    updateCurrentBlock $ appendInstruction' instr block
+
+    where
+      appendInstruction' i (LG.BasicBlock n is t) = LG.BasicBlock n (is ++ [i]) t
+
+
   -- Generate a named local variable name for each possible local variable
   setupLocals :: CFG ()
   setupLocals = do
     -- For each maximum locals, generate a name for it in advance
     maxLocals <- J.codeMaxLocals <$> gets codeMetaData
-    names <- forM [1..maxLocals] $ \i -> return $ LN.mkName ("L" ++ show i)
+    names <- forM [0..maxLocals] $ \i -> do
+      let name = LN.mkName ("L" ++ show i)
+      appendInstruction $ name LI.:= alloca LT.i32
+      return name
     modify $ \s -> s { localVariableNames = names }
+
+  -- Obtains the local variable at requested index
+  getLocal :: Integral a => a -> CFG LN.Name
+  getLocal idx = (!! fromIntegral idx) <$> gets localVariableNames
 
   -- Parse JVM Bytecode instructions into LLVM IR instructions
   parseInstructions :: CFG ()
@@ -103,6 +139,22 @@ module LLVMFrontend.CFG where
       J.ICONST_5 -> pushConstant $ int 5
       J.ICONST_M1 -> pushConstant $ int (-1)
 
+      -- Loads/Stores are assigned directly via Alloca
+      -- TODO: Need SSA conversions
+      J.ISTORE_ idx -> do
+        -- The index of the local variable normally is the next byte, but the
+        -- 'hs-java' library is gracious enough to provide us with a helper that
+        -- tags the next byte along with it.
+        localName <- getLocal $
+          case idx of
+            J.I0 -> 0
+            J.I1 -> 1
+            J.I2 -> 2
+            J.I3 -> 3
+
+        storeInstr <- store (local LT.i32 localName) <$> popOperand
+        appendInstruction (LI.Do storeInstr)
+
       -- Binary operations operate and utilize the operand stack to simulate the
       -- stack-machine nature of the JVM on the LLVM.
       J.IADD -> do
@@ -110,11 +162,17 @@ module LLVMFrontend.CFG where
         llvmInstr <- add <$> popOperand <*> popOperand
         tmpName <- LN.UnName <$> nextTemp
         pushOperand $ LO.LocalReference LT.i32 tmpName
+        appendInstruction $ tmpName LI.:= llvmInstr
+      -- Return instructions will pop off the top of the operand stack and use it as
+      -- the return value.
+      J.IRETURN -> do
+        retInstr <- ret <$> popOperand
+        setTerminator retInstr
+      _ -> return ()
 
-    -- Append to our current block...
-    block <- head <$> gets basicBlocks
-
-
+    whenM outOfInstructions $ do
+      retInstr <- ret <$> popOperand
+      setTerminator retInstr
     unlessM outOfInstructions parseInstructions
 
     where
