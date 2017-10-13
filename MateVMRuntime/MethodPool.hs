@@ -100,9 +100,10 @@ compileMethod name sig cls = do
   let code = M.fromList (arlist (methodAttributes meth)) M.! "Code"
   cfg <- parseCFG (decodeMethod code)
   let mod = AST.defaultModule { AST.moduleDefinitions = [defineFn AST.VoidType "main" (basicBlocks cfg)], AST.moduleName = "Dummy" }
-  compileMethod' mod
+  ast <- compileMethod' mod
+  error . show $ ast
 
-  error $ "JIT Compilation not implemented...\n" ++ "arMap: " ++ show (basicBlocks cfg)
+  error "JIT Compilation not implemented...\n"
 
 compileMethod' mod =
   -- Create a context used within this scope, which contains all LLVM-specific information
@@ -112,10 +113,11 @@ compileMethod' mod =
       -- Create an LLVM module from the AST generated...
       Mod.withModuleFromAST c mod $ \m ->
         -- Make a simple optimization pass
-        withPassManager defaultCuratedPassSetSpec { optLevel = Nothing } $ \pm -> do
+        withPassManager defaultCuratedPassSetSpec { optLevel = Just 3, sizeLevel = Just 3 } $ \pm -> do
+          runPassManager pm m
           optmod <- Mod.moduleAST m -- Optimized-copy of module
           s <- Mod.moduleLLVMAssembly m -- Convert from module to assembly
-          error $ C8.unpack s
+          printfJit $ C8.unpack s
 
           -- Actually execute module... execution engine is modified to contain the
           -- actual code...
@@ -125,7 +127,7 @@ compileMethod' mod =
             case mainfn of
               Just fn -> do
                 result <- code_void (castFunPtr fn :: FunPtr (IO ()))
-                putStrLn $ "Evaluated to: " ++ show result
+                printfJit $ "Evaluated to: " ++ show result
               Nothing -> return ()
 
           -- Optimized module used only in next pass...
