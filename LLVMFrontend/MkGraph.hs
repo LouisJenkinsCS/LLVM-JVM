@@ -79,6 +79,8 @@ module LLVMFrontend.MkGraph
   resolveReferences = do
       jvminsn <- instructions <$> get
       pc <- pcOffset <$> get
+
+      -- if there are no more JVM instructions, we are done here...
       if null jvminsn
         then do
           addPC 0 -- add entry instruction
@@ -86,10 +88,13 @@ module LLVMFrontend.MkGraph
         else do
           when (null jvminsn) $ error "resolveReferences: something is really wrong here"
           let ins = head jvminsn
-          addJumpTarget ins pc
-          incrementPC ins
+          addJumpTarget ins pc -- Handles whether this is a jump instruction or not
+          incrementPC ins -- Also handles incrementing for multi-bytecode instructions
           resolveReferences
     where
+      -- If the instruction is a jump instruction, we handle creating basic blocks
+      -- for them as needed. If the instruction is not a jump instruction, this
+      -- effectively becomes a NOP.
       addJumpTarget :: J.Instruction -> Int32 -> ParseState ()
       addJumpTarget ins pc = case ins of
           (IF _ rel) -> addPCs pc rel ins
@@ -104,16 +109,20 @@ module LLVMFrontend.MkGraph
           TABLESWITCH _ def _ _ offs -> addSwitch pc def offs
           LOOKUPSWITCH _ def _ switch' -> addSwitch pc def $ map snd switch'
           _ -> return ()
+      -- Add basic blocks for the _end_ of the current instruction (accounting for
+      -- the size of the instruction) to its requested jump target instruction.
       addPCs :: Int32 -> Word16 -> J.Instruction -> ParseState ()
       addPCs pc rel ins = do
-        addPC (pc + insnLength ins)
-        addPC (pc + w16Toi32 rel)
+        addPC (pc + insnLength ins) -- Some instructions use more than one bytecode
+        addPC (pc + w16Toi32 rel) -- Jump target for program counter
+
       addSwitch :: Int32 -> Word32 -> [Word32] -> ParseState ()
       addSwitch pc def offs = do
         let addrel = addPC . (+ pc) . fromIntegral
         mapM_ addrel offs
         addrel def
 
+  -- Creates a basic block entry for this program counter.
   addPC :: Int32 -> ParseState ()
   addPC bcoff = modify (\s -> s { blockEntries = S.insert bcoff (blockEntries s) })
 
