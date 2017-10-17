@@ -159,6 +159,12 @@ module LLVMFrontend.CFG where
 
         storeInstr <- store (local LT.i32 localName) <$> popOperand
         appendInstruction (LI.Do storeInstr)
+
+      J.ISTORE idx -> do
+        localName <- getLocal idx
+        storeInstr <- store (local LT.i32 localName) <$> popOperand
+        appendInstruction (LI.Do storeInstr)
+
       J.ILOAD_ idx -> do
         localName <- getLocal $
           case idx of
@@ -167,6 +173,12 @@ module LLVMFrontend.CFG where
             J.I2 -> 2
             J.I3 -> 3
 
+        tmpName <- LN.UnName <$> nextTemp
+        appendInstruction $ tmpName LI.:= load (local LT.i32 localName)
+        pushOperand $ LO.LocalReference LT.i32 tmpName
+
+      J.ILOAD idx -> do
+        localName <- getLocal idx
         tmpName <- LN.UnName <$> nextTemp
         appendInstruction $ tmpName LI.:= load (local LT.i32 localName)
         pushOperand $ LO.LocalReference LT.i32 tmpName
