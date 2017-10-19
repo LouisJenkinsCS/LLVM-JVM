@@ -116,6 +116,7 @@ module LLVMFrontend.MkGraph
         addPC (pc + insnLength ins) -- Some instructions use more than one bytecode
         addPC (pc + w16Toi32 rel) -- Jump target for program counter
 
+      -- Add a basic block for the switch instruction and all case statements.
       addSwitch :: Int32 -> Word32 -> [Word32] -> ParseState ()
       addSwitch pc def offs = do
         let addrel = addPC . (+ pc) . fromIntegral
@@ -130,6 +131,7 @@ module LLVMFrontend.MkGraph
   mkMethod :: Graph (MateIR Var) C C -> ParseState (Graph (MateIR Var) O C)
   mkMethod g = do
     hs <- handlerStarts <$> get
+    -- Create labels for each exception handler, as well as for the entry block.
     entryseq <- mkLast <$> IRExHandler <$> mapM addLabel (S.toList hs ++ [0])
     return $ entryseq |*><*| g
 
@@ -138,6 +140,7 @@ module LLVMFrontend.MkGraph
     pc <- pcOffset <$> get
     entries <- blockEntries <$> get
     jvminsn <- instructions <$> get
+
     if null jvminsn
       then return []
       else if S.member pc entries
@@ -150,7 +153,7 @@ module LLVMFrontend.MkGraph
 
   mkBlock :: ParseState (Graph (MateIR Var) C C)
   mkBlock = do
-    modify (\s -> s { nextTargets = [] })
+    modify (\s -> s { nextTargets = [] }) -- Clear state
     handlermap <- exceptionMap <$> get
     pc <- pcOffset <$> get
     l <- addLabel pc
@@ -161,6 +164,10 @@ module LLVMFrontend.MkGraph
         apush (VReg (VR preeax JRef))
         return $ Just $ fromIntegral pc
       else return Nothing
+
+    -- Compute the exception handlers that we are apart of. As there cna be nested
+    -- exception handlers/try-catch blocks, we end up with a list of the ones we
+    -- are contained in.
     let extable = map (second fromIntegral)
                   $ concatMap snd
                   $ handlermap `IM.containing` pc
@@ -177,22 +184,28 @@ module LLVMFrontend.MkGraph
     (ms', l') <- toMid
     return $ mkFirst f' <*> mkMiddles (fixup ++ ms') <*> mkLast l'
 
+  -- Add a label for the provided program counter, if not already.
   addLabel :: Int32 -> ParseState Label
   addLabel boff = do
     lmap <- labels <$> get
     if M.member boff lmap
-      then return $ lmap M.! boff
+      then return $ lmap M.! boff -- Already present
       else do
+        -- Construct a new label. We also create an outgoing edge to the label,
+        -- as otherwise it would violate the basic block invariant.
         label <- lift freshLabel
         modify (\s -> s { labels = M.insert boff label (labels s)
                         , nextTargets = label : nextTargets s })
         return label
 
+  -- Increment program counter, also  handling multibyte instructions.
   incrementPC :: J.Instruction -> ParseState ()
   incrementPC ins = do
     modify (\s -> s { pcOffset = pcOffset s + insnLength ins})
     popInstruction
 
+  -- Advance current instruction. Note that the instruction is not returned, meaning
+  -- the current instruction must be queried independently.
   popInstruction :: ParseState ()
   popInstruction = do
     i <- instructions <$> get
@@ -208,10 +221,12 @@ module LLVMFrontend.MkGraph
       entries <- blockEntries <$> get
       if S.member (pc + insnLength ins) entries
         then do
+          -- Refers to an already-existing basic block...
           res <- toLast ins
           incrementPC ins
           return res
         else do
+          -- Points to an instruction, map to IR...
           insIR <- tir ins
           incrementPC ins
           first (insIR ++) <$> toMid
@@ -219,10 +234,13 @@ module LLVMFrontend.MkGraph
       toLast :: J.Instruction -> ParseState ([MateIR Var O O], MateIR Var O C)
       toLast ins = do
         pc <- pcOffset <$> get
+        -- Handle if-else statement, where we have two outgoing edges from the
+        -- conditionally-executed basic block, and to the end of the basic block.
         let ifstuff jcmp rel op1 op2 = do
               truejmp <- addLabel (pc + w16Toi32 rel)
               falsejmp <- addLabel (pc + insnLength ins)
               return ([], IRIfElse jcmp op1 op2 truejmp falsejmp)
+        -- Handle switch statements, adding outgoing edges to each case statement.
         let switchins def switch' = do
               y <- apop
               switch <- forM switch' $ \(v, o) -> do
