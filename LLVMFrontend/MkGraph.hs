@@ -231,6 +231,8 @@ module LLVMFrontend.MkGraph
           incrementPC ins
           first (insIR ++) <$> toMid
     where
+      -- Handle conditional and unconditional jumps here. We create the appropriate
+      -- basic blocks for the instructions as well.
       toLast :: J.Instruction -> ParseState ([MateIR Var O O], MateIR Var O C)
       toLast ins = do
         pc <- pcOffset <$> get
@@ -290,6 +292,7 @@ module LLVMFrontend.MkGraph
         fixups <- handleBlockEnd
         return (ret1 ++ fixups, ret2)
         where
+          -- Return the top operand (after performing type-checking)
           returnSomething t = do
             r <- apop
             unless (varType r == t) $ error "toLast return: type mismatch"
@@ -311,6 +314,8 @@ module LLVMFrontend.MkGraph
           return (IROp Add vreg x (nul (varType x)))
       else return []
 
+  -- Calculates length of instruction, also taking into account whether or not
+  -- it is multibyte.
   insnLength :: Integral a => J.Instruction -> a
   insnLength x = case x of
     (TABLESWITCH padding _ _ _ xs) ->
@@ -361,6 +366,8 @@ module LLVMFrontend.MkGraph
   resetPC jvmins =
     modify (\s -> s { pcOffset = 0, instructions = jvmins })
 
+  -- Converts a JVM Classfile IMM (immediate constant) to the actual number.
+  -- For example, imm2num (ICONST_ x) will yield the actual number associated with it.
   imm2num :: Num a => IMM -> a
   imm2num I0 = 0
   imm2num I1 = 1
@@ -395,6 +402,7 @@ module LLVMFrontend.MkGraph
       (MethodSignature args _) = methodSignature meth
       isStatic = if methodIsStatic meth then (+0) else (+1)
 
+  -- TODO: Map to LLVM Type?
   fieldType2VarType :: FieldType -> VarType
   fieldType2VarType IntType = JInt
   fieldType2VarType CharByte = JInt
@@ -405,6 +413,7 @@ module LLVMFrontend.MkGraph
   fieldType2VarType x = error $ "fieldType2VarType: " ++ show x
 
   -- tir = transform to IR
+  -- TODO: Convert this to create LLVM...
   tir :: J.Instruction -> ParseState [MateIR Var O O]
   tir ACONST_NULL = do apush JRefNull; return []
   tir ICONST_M1 = tir (BIPUSH 0xff) -- (-1)
