@@ -34,21 +34,31 @@ module LLVMFrontend.MkGraph
   import MateVMRuntime.Types
   import MateVMRuntime.NativeSizes
 
+  import Control.Monad.Extra
+
+  import qualified Data.Vector as Vec
+  import Data.Vector(Vector)
+
+  import qualified LLVM.AST.Instruction as LI
+  import qualified LLVM.AST.Global as LG
+  import qualified LLVM.AST.Constant as LC
+  import qualified LLVM.AST.Operand as LO
+  import qualified LLVM.AST.Name as LN
+  import qualified LLVM.AST.Type as LT
+  import LLVMFrontend.Helpers
+
   -- import Debug.Trace
 
   data ParseState' = ParseState'
-    { labels :: M.Map Int32 Label {- store offset -> label -}
-
-    , nextTargets :: [Label] {- only valid per block. needed for block fixups -}
-    , blockInterfaces :: M.Map Label [Var] {- store interface map for basic blocks -}
+    { labels :: M.Map Int32 LN.Name {- store offset -> label -}
+    , nBlocks :: Int
     , blockEntries :: S.Set Int32 {- store block entries (data gained from first pass) -}
 
     , pcOffset :: Int32 {- programm counter -}
-    , stack :: [Var] {- simulation stack -}
-    , regcnt :: VRegNR {- counter for virtual registers -}
+    , operandStack :: [LO.Operand] {- simulation stack -}
+    , autotmpN :: Int {- Counter for autotmp registers -}
     , classf :: Class Direct {- reference to class of processed method -}
     , method :: Method Direct {- reference to processed method -}
-    , preRegs :: RegMapping
 
     , instructions :: [J.Instruction] {- instructions to process -}
     -- Note: The ExceptionMap is a type-alias for the IntervalMap, which maps an
@@ -59,7 +69,25 @@ module LLVMFrontend.MkGraph
     , handlerStarts :: S.Set Int32 {- set of handler starts -}
     }
 
-  type ParseState a = StateT ParseState' SimpleUniqueMonad a
+  type ParseState a = State ParseState' a
+
+  -- Appends an instruction to the specified basic block by creating a copy containing
+  -- the requested instruction.
+  appendInstruction :: LI.Named LI.Instruction -> ParseState ()
+  appendInstruction instr = do
+    block <- head <$> gets basicBlocks
+    updateCurrentBlock $ appendInstruction' instr block
+
+    where
+      appendInstruction' i (LG.BasicBlock n is t) = LG.BasicBlock n (is ++ [i]) t
+
+
+  -- Generate Basic Block name
+  generateBasicBlockName :: ParseState LN.Name
+  generateBasicBlockName = do
+    n <- gets nBlocks
+    modify' $ \s -> s { nBlocks = n + 1 }
+    return . LN.mkName $ "BB" ++ show n
 
   -- Split exception handlers and try-catch blocks into their own basic blocks.
   addExceptionBlocks :: ParseState ()
@@ -128,14 +156,14 @@ module LLVMFrontend.MkGraph
   addPC bcoff = modify (\s -> s { blockEntries = S.insert bcoff (blockEntries s) })
 
 
-  mkMethod :: Graph (MateIR Var) C C -> ParseState (Graph (MateIR Var) O C)
+  mkMethod :: ParseState ()
   mkMethod g = do
     hs <- handlerStarts <$> get
     -- Create labels for each exception handler, as well as for the entry block.
-    entryseq <- mkLast <$> IRExHandler <$> mapM addLabel (S.toList hs ++ [0])
-    return $ entryseq |*><*| g
+    forM_ addLabel (S.toList hs ++ [0])
+    return ()
 
-  mkBlocks :: ParseState [Graph (MateIR Var) C C]
+  mkBlocks :: ParseState ()
   mkBlocks = do
     pc <- pcOffset <$> get
     entries <- blockEntries <$> get
@@ -145,25 +173,20 @@ module LLVMFrontend.MkGraph
       then return []
       else if S.member pc entries
         then do
-          g <- mkBlock
-          gs <- mkBlocks
-          return $ g : gs
+          mkBlock
+          mkBlocks
+          return ()
         else error $ "mkBlocks: something wrong here. pc: " ++ show pc ++
                      "\ninsn: " ++ show jvminsn
 
-  mkBlock :: ParseState (Graph (MateIR Var) C C)
+  mkBlock :: ParseState ()
   mkBlock = do
-    modify (\s -> s { nextTargets = [] }) -- Clear state
     handlermap <- exceptionMap <$> get
     pc <- pcOffset <$> get
     l <- addLabel pc
-    -- push JRef for Exceptionblock, which is passed via %eax
+    -- push LT.ptr for Exceptionblock, which is passed via %eax
     isExceptionHandler <- S.member pc <$> handlerStarts <$> get
-    handlerStart <- if isExceptionHandler
-      then do
-        apush (VReg (VR preeax JRef))
-        return $ Just $ fromIntegral pc
-      else return Nothing
+    let handlerStart = if isExceptionHandler then Just . fromIntegral $ pc else Nothing
 
     -- Compute the exception handlers that we are apart of. As there cna be nested
     -- exception handlers/try-catch blocks, we end up with a list of the ones we
@@ -171,21 +194,22 @@ module LLVMFrontend.MkGraph
     let extable = map (second fromIntegral)
                   $ concatMap snd
                   $ handlermap `IM.containing` pc
-    let f' = IRLabel l extable handlerStart
+    -- let f' = IRLabel l extable handlerStart
     -- fixup block boundaries
-    be <- -- trace (printf "pc: %d\nhstart: %s\nextable: %s\n" pc (show handlerStart) (show extable)) $
-          M.lookup l <$> blockInterfaces <$> get
-    fixup <- case be of
-      Nothing -> return []
-      Just ts -> forM ts $ \x -> do
-                   nv <- newvar $ varType x
-                   apush nv
-                   return $ IROp Add nv x (nul (varType x))
+    -- be <- -- trace (printf "pc: %d\nhstart: %s\nextable: %s\n" pc (show handlerStart) (show extable)) $
+    --       M.lookup l <$> blockInterfaces <$> get
+    -- fixup <- case be of
+    --   Nothing -> return []
+    --   Just ts -> forM ts $ \x -> do
+    --                nv <- newvar $ varType x
+    --                apush nv
+    --                return $ IROp Add nv x (nul (varType x))
     (ms', l') <- toMid
-    return $ mkFirst f' <*> mkMiddles (fixup ++ ms') <*> mkLast l'
+    -- mkFirst f' <*> mkMiddles (fixup ++ ms') <*> mkLast l'
+    return ()
 
   -- Add a label for the provided program counter, if not already.
-  addLabel :: Int32 -> ParseState Label
+  addLabel :: Int32 -> ParseState LN.Name
   addLabel boff = do
     lmap <- labels <$> get
     if M.member boff lmap
@@ -193,9 +217,8 @@ module LLVMFrontend.MkGraph
       else do
         -- Construct a new label. We also create an outgoing edge to the label,
         -- as otherwise it would violate the basic block invariant.
-        label <- lift freshLabel
-        modify (\s -> s { labels = M.insert boff label (labels s)
-                        , nextTargets = label : nextTargets s })
+        label <- generateBasicBlockName
+        modify (\s -> s { labels = M.insert boff label (labels s) })
         return label
 
   -- Increment program counter, also  handling multibyte instructions.
@@ -212,7 +235,7 @@ module LLVMFrontend.MkGraph
     when (null i) $ error "popInstruction: something is really wrong here"
     modify (\s -> s { instructions = tail i })
 
-  toMid :: ParseState ([MateIR Var O O], MateIR Var O C)
+  toMid :: ParseState ()
   toMid = do
       pc <- pcOffset <$> get
       insns <- instructions <$> get
@@ -233,7 +256,7 @@ module LLVMFrontend.MkGraph
     where
       -- Handle conditional and unconditional jumps here. We create the appropriate
       -- basic blocks for the instructions as well.
-      toLast :: J.Instruction -> ParseState ([MateIR Var O O], MateIR Var O C)
+      toLast :: J.Instruction -> ParseState ()
       toLast ins = do
         pc <- pcOffset <$> get
         -- Handle if-else statement, where we have two outgoing edges from the
@@ -241,78 +264,62 @@ module LLVMFrontend.MkGraph
         let ifstuff jcmp rel op1 op2 = do
               truejmp <- addLabel (pc + w16Toi32 rel)
               falsejmp <- addLabel (pc + insnLength ins)
-              return ([], IRIfElse jcmp op1 op2 truejmp falsejmp)
+              error "Conditionals not supported..."
+              -- return ([], IRIfElse jcmp op1 op2 truejmp falsejmp)
         -- Handle switch statements, adding outgoing edges to each case statement.
         let switchins def switch' = do
               y <- apop
               switch <- forM switch' $ \(v, o) -> do
                 offset <- addLabel $ pc + fromIntegral o
-                return (Just (w32Toi32 v), offset)
+                error "Conditionals not supported..."
+                -- return (Just (w32Toi32 v), offset)
               defcase <- addLabel $ pc + fromIntegral def
-              return ([], IRSwitch y $ switch ++ [(Nothing, defcase)])
+              error "Conditionals not supported..."
+              -- return ([], IRSwitch y $ switch ++ [(Nothing, defcase)])
         (ret1, ret2) <- case ins of
-          RETURN -> return ([], IRReturn Nothing)
-          ARETURN -> returnSomething JRef
-          IRETURN -> returnSomething JInt
-          LRETURN -> error "toLast: LReturn"
-          FRETURN -> returnSomething JFloat
-          DRETURN -> error "toLast: DReturn"
-          (IF jcmp rel) -> do
-            let op1 = JIntValue 0
-            op2 <- apop
-            unless (varType op2 == JInt) $ error "toLast IF: type mismatch"
-            ifstuff jcmp rel op1 op2
-          (IFNULL rel) -> do
-            op1 <- apop
-            unless (varType op1 == JRef) $ error "toLast IFNULL: type mismatch"
-            ifstuff C_EQ rel op1 (JIntValue 0)
-          (IFNONNULL rel) -> do
-            op1 <- apop
-            unless (varType op1 == JRef) $ error "toLast IFNONNULL: type mismatch"
-            ifstuff C_NE rel op1 (JIntValue 0)
-          (IF_ICMP jcmp rel) -> do
-            op1 <- apop
-            op2 <- apop
-            unless (varType op1 == varType op2) $ error "toLast IF_ICMP: type mismatch"
-            ifstuff jcmp rel op1 op2
-          (IF_ACMP jcmp rel) -> do
-            op1 <- apop
-            op2 <- apop
-            unless (varType op1 == varType op2) $ error "toLast IF_ACMP: type mismatch"
-            ifstuff jcmp rel op1 op2
-          (GOTO rel) -> do
-            jump <- addLabel (pc + w16Toi32 rel)
-            return ([], IRJump jump)
+          RETURN -> return ([], retvoid)
+          ARETURN -> returnSomething LT.i32
+          IRETURN -> returnSomething LT.i32
+          LRETURN -> returnSomething LT.i64
+          FRETURN -> returnSomething LT.float
+          DRETURN -> returnSomething LT.double
+          (IF jcmp rel) -> error "Conditionals not supported..."
+          (IFNULL rel) -> error "Conditionals not supported..."
+          (IFNONNULL rel) -> error "Conditionals not supported..."
+          (IF_ICMP jcmp rel) -> error "Conditionals not supported..."
+          (IF_ACMP jcmp rel) -> error "Conditionals not supported..."
+          (GOTO rel) -> error "Conditionals not supported..."
           TABLESWITCH _ def low high offs -> switchins def $ zip [low..high] offs
           LOOKUPSWITCH _ def _ switch -> switchins def switch
           _ -> do -- fallthrough case
-            next <- addLabel (pc + insnLength ins)
+            -- next <- addLabel (pc + insnLength ins)
             insIR <- tir ins
-            return (insIR, IRJump next)
+            error $ "Processing instruction: " ++ show insIR
         fixups <- handleBlockEnd
         return (ret1 ++ fixups, ret2)
         where
           -- Return the top operand (after performing type-checking)
           returnSomething t = do
             r <- apop
-            unless (varType r == t) $ error "toLast return: type mismatch"
-            return ([], IRReturn $ Just r)
+            error $ "Processing Type: " ++ show t ++ ", " ++ show r
+            -- unless (varType r == t) $ error "toLast return: type mismatch"
+            -- return ([], IRReturn $ Just r)
 
-  handleBlockEnd :: ParseState [MateIR Var O O]
-  handleBlockEnd = do
-    st <- get
-    let len = L.genericLength $ stack st
-    if len > 0
-      then
-        forM [600000 .. (600000 + len - 1)] $ \r -> do
-          x <- apop
-          let vreg = VReg (VR r (varType x))
-          targets <- nextTargets <$> get
-          forM_ targets $ \t -> do
-            be <- fromMaybe [] <$> M.lookup t <$> blockInterfaces <$> get
-            modify (\s -> s { blockInterfaces = M.insert t (vreg:be) (blockInterfaces s)})
-          return (IROp Add vreg x (nul (varType x)))
-      else return []
+  -- handleBlockEnd :: ParseState [MateIR Var O O]
+  -- handleBlockEnd = do
+  --   st <- get
+  --   let len = L.genericLength $ stack st
+  --   if len > 0
+  --     then
+  --       forM [600000 .. (600000 + len - 1)] $ \r -> do
+  --         x <- apop
+  --         let vreg = VReg (VR r (varType x))
+  --         targets <- nextTargets <$> get
+  --         forM_ targets $ \t -> do
+  --           be <- fromMaybe [] <$> M.lookup t <$> blockInterfaces <$> get
+  --           modify (\s -> s { blockInterfaces = M.insert t (vreg:be) (blockInterfaces s)})
+  --         return (IROp Add vreg x (nul (varType x)))
+  --     else return []
 
   -- Calculates length of instruction, also taking into account whether or not
   -- it is multibyte.
@@ -374,13 +381,13 @@ module LLVMFrontend.MkGraph
   imm2num I2 = 2
   imm2num I3 = 3
 
-  fieldType :: Class Direct -> Word16 -> VarType
+  fieldType :: Class Direct -> Word16 -> LT.Type
   fieldType cls off = fieldType2VarType $ ntSignature nt
     where nt = case constsPool cls M.! off of
                   (CField _ nt') -> nt'
                   _ -> error "fieldType: fail :("
 
-  methodType :: Bool -> Class Direct -> Word16 -> ([VarType], Maybe VarType)
+  methodType :: Bool -> Class Direct -> Word16 -> ([LT.Type], Maybe LT.Type)
   methodType isVirtual cls off = (map fieldType2VarType argst', rett)
     where
       argst' = if isVirtual then ObjectType "this" : argst else argst
@@ -403,19 +410,19 @@ module LLVMFrontend.MkGraph
       isStatic = if methodIsStatic meth then (+0) else (+1)
 
   -- TODO: Map to LLVM Type?
-  fieldType2VarType :: FieldType -> VarType
-  fieldType2VarType IntType = JInt
-  fieldType2VarType CharByte = JInt
-  fieldType2VarType BoolType = JInt
-  fieldType2VarType FloatType = JFloat
-  fieldType2VarType (ObjectType _) = JRef
-  fieldType2VarType (Array _ _) = JRef -- fieldType2VarType ty -- TODO
+  fieldType2VarType :: FieldType -> LT.Type
+  fieldType2VarType IntType = LT.i32
+  fieldType2VarType CharByte = LT.i8
+  fieldType2VarType BoolType = LT.i1
+  fieldType2VarType FloatType = LT.float
+  fieldType2VarType (ObjectType _) = LT.ptr
+  fieldType2VarType (Array _ _) = LT.ptr -- fieldType2VarType ty -- TODO
   fieldType2VarType x = error $ "fieldType2VarType: " ++ show x
 
   -- tir = transform to IR
   -- TODO: Convert this to create LLVM...
-  tir :: J.Instruction -> ParseState [MateIR Var O O]
-  tir ACONST_NULL = do apush JRefNull; return []
+  tir :: J.Instruction -> ParseState [LI.Instruction]
+  -- tir ACONST_NULL = do apush LT.ptrNull; return []
   tir ICONST_M1 = tir (BIPUSH 0xff) -- (-1)
   tir ICONST_0 = tir (BIPUSH 0)
   tir ICONST_1 = tir (BIPUSH 1)
@@ -423,266 +430,293 @@ module LLVMFrontend.MkGraph
   tir ICONST_3 = tir (BIPUSH 3)
   tir ICONST_4 = tir (BIPUSH 4)
   tir ICONST_5 = tir (BIPUSH 5)
-  tir (BIPUSH x) = do apush $ JIntValue (w8Toi32 x); return []
-  tir (SIPUSH x) = do apush $ JIntValue (w16Toi32 x); return []
-  tir FCONST_0 =  do apush $ JFloatValue 0; return []
-  tir FCONST_1 =  do apush $ JFloatValue 1; return []
-  tir FCONST_2 =  do apush $ JFloatValue 3; return []
+  tir (BIPUSH x) = do apush $ LO.ConstantOperand $ int x; return []
+  tir (SIPUSH x) = do apush $ LO.ConstantOperand $ int x; return []
+  tir FCONST_0 =  do apush $ LO.ConstantOperand $ LC.Float 0; return []
+  tir FCONST_1 =  do apush $ LO.ConstantOperand $ LC.Float 1; return []
+  tir FCONST_2 =  do apush $ LO.ConstantOperand $ LC.Float 3; return []
   tir (ILOAD_ x) = tir (ILOAD (imm2num x))
-  tir (ILOAD x) = do tirLoad x JInt -- tirLoad' x JInt; return []
+  tir (ILOAD x) = tirLoad x LT.i32 -- tirLoad' x LT.i32; return []
   tir (IINC x con) = do
-    tirLoad' x JInt
+    tirLoad' x LT.i32
     y <- apop
-    nv <- newvar JInt
+    nv <- newvar LT.i32
     apush nv
-    storeinsn <- tirStore x JInt
-    return $ IROp Add nv y (JIntValue (w8Toi32 con)) : storeinsn
+    storeinsn <- tirStore x LT.i32
+    error "Not Supported"
+    -- return $ IROp Add nv y (LT.i32Value (w8Toi32 con)) : storeinsn
   tir (ALOAD_ x) = tir (ALOAD (imm2num x))
-  tir (ALOAD x) = tirLoad x JRef
+  tir (ALOAD x) = tirLoad x LT.ptr
   tir (FLOAD_ x) = tir (FLOAD (imm2num x))
-  tir (FLOAD x) = tirLoad x JFloat
+  tir (FLOAD x) = tirLoad x LT.float
   tir (ISTORE_ x) = tir (ISTORE (imm2num x))
-  tir (ISTORE y) = tirStore y JInt
+  tir (ISTORE y) = tirStore y LT.i32
   tir (FSTORE_ y) = tir (FSTORE (imm2num y))
-  tir (FSTORE y) = tirStore y JFloat
+  tir (FSTORE y) = tirStore y LT.float
   tir (ASTORE_ x) = tir (ASTORE (imm2num x))
-  tir (ASTORE x) = tirStore x JRef
+  tir (ASTORE x) = tirStore x LT.ptr
   tir (PUTFIELD x) = do
-    src <- apop
-    obj <- apop
-    unless (JRef == varType obj) $ error "putfield: type mismatch"
-    cls <- classf <$> get
-    unless (fieldType cls x == varType src) $ error "putfield: type mismatch2"
-    return [IRStore (RTPool x) obj src]
+    error "Not Supported"
+    -- src <- apop
+    -- obj <- apop
+    -- unless (LT.ptr == varType obj) $ error "putfield: type mismatch"
+    -- cls <- classf <$> get
+    -- unless (fieldType cls x == varType src) $ error "putfield: type mismatch2"
+    -- return [IRStore (RTPool x) obj src]
   tir (GETFIELD x) = do
-    obj <- apop
-    unless (JRef == varType obj) $ error "getfield: type mismatch"
-    cls <- classf <$> get
-    nv <- newvar (fieldType cls x)
-    apush nv
-    return [IRLoad (RTPool x) obj nv]
+    error "Not Supported"
+    -- obj <- apop
+    -- unless (LT.ptr == varType obj) $ error "getfield: type mismatch"
+    -- cls <- classf <$> get
+    -- nv <- newvar (fieldType cls x)
+    -- apush nv
+    -- return [IRLoad (RTPool x) obj nv]
   tir (GETSTATIC x) = do
-    cls <- classf <$> get
-    nv <- newvar (fieldType cls x)
-    apush nv
-    return [IRLoad (RTPool x) JRefNull nv]
+    error "Not Supported"
+    -- cls <- classf <$> get
+    -- nv <- newvar (fieldType cls x)
+    -- apush nv
+    -- return [IRLoad (RTPool x) LT.ptrNull nv]
   tir (PUTSTATIC x) = do
-    y <- apop
-    return [IRStore (RTPool x) JRefNull y]
+    error "Not Supported"
+    -- y <- apop
+    -- return [IRStore (RTPool x) LT.ptrNull y]
   tir (LDC1 x) = tir (LDC2 (fromIntegral x))
   tir (LDC2 x) = do
     cls <- classf <$> get
     let valuetype = case constsPool cls M.! x of
-              (CString _) -> JRef
-              (CInteger _) -> JInt
+              (CString _) -> LT.ptr
+              (CInteger _) -> LT.i32
               e -> error $ "tir: LDCI... missing impl.: " ++ show e
     nv <- newvar valuetype
     apush nv
-    return [IRLoad (RTPool x) JRefNull nv]
+    error "Not Supported..."
+    -- return [IRLoad (RTPool x) LT.ptrNull nv]
   tir (NEW x) = do
-    nv <- newvar JRef
-    apush nv
-    return [IRLoad (RTPoolCall x []) JRefNull nv]
+    error "Not Supported"
+    -- nv <- newvar LT.ptr
+    -- apush nv
+    -- return [IRLoad (RTPoolCall x []) LT.ptrNull nv]
   tir (ANEWARRAY _) = tirArray ReferenceType 10 -- for int. TODO?
   tir (NEWARRAY w8) = tirArray PrimitiveType w8
   tir ARRAYLENGTH = do
-    array <- apop
-    when (varType array /= JRef) $ error "tir: arraylength: type mismatch"
-    nv <- newvar JInt
-    apush nv
-    return [IRLoad RTArrayLength array nv]
-  tir AALOAD = tirArrayLoad JRef Nothing
-  tir IALOAD = tirArrayLoad JInt Nothing
-  tir CALOAD = tirArrayLoad JInt (Just 0xff)
-  tir AASTORE = tirArrayStore JRef Nothing
-  tir IASTORE = tirArrayStore JInt Nothing
-  tir CASTORE = tirArrayStore JInt (Just 0xff)
+    error "Not Supported"
+    -- array <- apop
+    -- when (varType array /= LT.ptr) $ error "tir: arraylength: type mismatch"
+    -- nv <- newvar LT.i32
+    -- apush nv
+    -- return [IRLoad RTArrayLength array nv]
+  tir AALOAD = tirArrayLoad LT.ptr Nothing
+  tir IALOAD = tirArrayLoad LT.i32 Nothing
+  tir CALOAD = tirArrayLoad LT.i32 (Just 0xff)
+  tir AASTORE = tirArrayStore LT.ptr Nothing
+  tir IASTORE = tirArrayStore LT.i32 Nothing
+  tir CASTORE = tirArrayStore LT.i32 (Just 0xff)
   tir DUP = do
-    x <- apop
-    apush x
-    nv <- newvar (varType x)
-    apush nv
-    return [IROp Add nv x (JIntValue 0)]
+    error "Not Supported"
+    -- x <- apop
+    -- apush x
+    -- nv <- newvar (varType x)
+    -- apush nv
+    -- return [IROp Add nv x (LT.i32Value 0)]
   tir DUP_X1 = do
-    v1 <- apop; v2 <- apop
-    nv <- newvar (varType v1)
-    apush nv
-    apush v2; apush v1
-    return [IROp Add nv v1 (JIntValue 0)]
+    error "Not Supported"
+    -- v1 <- apop; v2 <- apop
+    -- nv <- newvar (varType v1)
+    -- apush nv
+    -- apush v2; apush v1
+    -- return [IROp Add nv v1 (LT.i32Value 0)]
   tir DUP_X2 = do
     -- WARNING: different behaviour for LONG & DOUBLE!!
     -- see, category 2 computational type (§2.11.1).
-    v1 <- apop; v2 <- apop; v3 <- apop
-    nv <- newvar (varType v1)
-    apush nv
-    apush v3; apush v2; apush v1
-    return [IROp Add nv v1 (JIntValue 0)]
+    error "Not Supported"
+    -- v1 <- apop; v2 <- apop; v3 <- apop
+    -- nv <- newvar (varType v1)
+    -- apush nv
+    -- apush v3; apush v2; apush v1
+    -- return [IROp Add nv v1 (LT.i32Value 0)]
   tir POP = do apop; return []
-  tir IADD = tirOpInt Add JInt
-  tir ISUB = tirOpInt Sub JInt
+  tir IADD = tirOpInt LI.Add LT.i32
+  tir ISUB = tirOpInt LI.Sub LT.i32
   tir INEG = do
     x <- apop
-    apush (JIntValue 0)
+    apush (LO.ConstantOperand $ int 0)
     apush x
-    tirOpInt Sub JInt
-  tir IMUL = tirOpInt Mul JInt
-  tir IDIV = tirOpInt Div JInt
-  tir IREM = tirOpInt Rem JInt
-  tir IAND = tirOpInt And JInt
-  tir IOR = tirOpInt Or JInt
-  tir IXOR = tirOpInt Xor JInt
-  tir IUSHR = tirOpInt ShiftRightLogical JInt
-  tir ISHR = tirOpInt ShiftRightArth JInt
-  tir ISHL = tirOpInt ShiftLeft JInt
-  tir FADD = tirOpInt Add JFloat
+    tirOpInt LI.Sub LT.i32
+  tir IMUL = tirOpInt LI.Mul LT.i32
+  tir IDIV = tirOpInt LI.SDiv LT.i32
+  tir IREM = tirOpInt LI.SRem LT.i32
+  tir IAND = tirOpInt LI.And LT.i32
+  tir IOR = tirOpInt LI.Or LT.i32
+  tir IXOR = tirOpInt LI.Xor LT.i32
+  tir IUSHR = tirOpInt LI.LShr LT.i32
+  tir ISHR = tirOpInt LI.AShr LT.i32
+  tir ISHL = tirOpInt LI.Shl LT.i32
+  tir FADD = tirOpInt LI.Add LT.float
   tir I2C = do
-    x <- apop
-    when (varType x /= JInt) $ error "tir: i2c: type mismatch"
-    nv <- newvar JInt
-    apush nv
-    return [IROp And nv x (JIntValue 0xff)]
-  tir (INVOKESTATIC ident) = tirInvoke CallStatic ident
-  tir (INVOKESPECIAL ident) = tirInvoke CallSpecial ident
-  tir (INVOKEVIRTUAL ident) = tirInvoke CallVirtual ident
-  tir (INVOKEINTERFACE ident _) = tirInvoke CallInterface ident
-  tir i@(CHECKCAST _) = do
-    y <- apop
-    apush y
-    return [IRMisc1 i y]
-  tir i@(INSTANCEOF _) = do
-    y <- apop
-    nv <- newvar JInt
-    apush nv
-    return [IRMisc2 i nv y]
-  tir i@ATHROW = do
-    y <- apop
-    return [IRMisc1 i y]
-  tir MONITORENTER = do -- TODO: stub!
-    apop; return []
-  tir MONITOREXIT = do -- TODO: stub!
-    apop; return []
-  tir x = error $ "tir: " ++ show x
+    error "Not Supported"
+    -- x <- apop
+    -- when (varType x /= LT.i32) $ error "tir: i2c: type mismatch"
+    -- nv <- newvar LT.i32
+    -- apush nv
+    -- return [IROp And nv x (LT.i32Value 0xff)]
+  -- tir (INVOKESTATIC ident) = tirInvoke CallStatic ident
+  -- tir (INVOKESPECIAL ident) = tirInvoke CallSpecial ident
+  -- tir (INVOKEVIRTUAL ident) = tirInvoke CallVirtual ident
+  -- tir (INVOKEINTERFACE ident _) = tirInvoke CallInterface ident
+  -- tir i@(CHECKCAST _) = do
+  --   y <- apop
+  --   apush y
+  --   return [IRMisc1 i y]
+  -- tir i@(INSTANCEOF _) = do
+  --   y <- apop
+  --   nv <- newvar LT.i32
+  --   apush nv
+  --   return [IRMisc2 i nv y]
+  -- tir i@ATHROW = do
+  --   y <- apop
+  --   return [IRMisc1 i y]
+  -- tir MONITORENTER = do -- TODO: stub!
+  --   apop; return []
+  -- tir MONITOREXIT = do -- TODO: stub!
+  --   apop; return []
+  -- tir x = error $ "tir: " ++ show x
 
-  tirArray :: MateObjType -> Word8 -> ParseState [MateIR Var O O]
+  tirArray :: MateObjType -> Word8 -> ParseState ()
   tirArray objtype w8 = do
-    len <- apop
-    when (varType len /= JInt) $ error "tir: tirArray: type mismatch"
-    nv <- newvar JRef
-    apush nv
-    return [IRLoad (RTArrayNew w8 objtype [] len) JRefNull nv]
+    error "Not Supported"
+    -- len <- apop
+    -- when (varType len /= LT.i32) $ error "tir: tirArray: type mismatch"
+    -- nv <- newvar LT.ptr
+    -- apush nv
+    -- return [IRLoad (RTArrayNew w8 objtype [] len) LT.ptrNull nv]
+  --
+  -- tirArrayLoad :: VarType -> Maybe Int32 {- Mask -} -> ParseState [MateIR Var O O]
+  -- tirArrayLoad t mask = do
+  --   idx <- apop
+  --   array <- apop
+  --   when (varType array /= LT.ptr) $ error "tir: aaload: type mismatch1"
+  --   when (varType idx /= LT.i32) $ error "tir: aaload: type mismatch2"
+  --   nv <- newvar t
+  --   apush nv
+  --   case mask of
+  --     Just m -> do
+  --       _ <- apop
+  --       nv' <- newvar LT.i32
+  --       apush nv'
+  --       return [ IRLoad (RTArrayIndex idx t) array nv
+  --              , IROp And nv' nv (LT.i32Value m)]
+  --     _ -> return [IRLoad (RTArrayIndex idx t) array nv]
+  --
+  -- tirArrayStore :: VarType -> Maybe Int32 {- Mask -} -> ParseState [MateIR Var O O]
+  -- tirArrayStore t mask = do
+  --   value <- apop
+  --   idx <-   apop
+  --   array <- apop
+  --   when (varType array /= LT.ptr) $
+  --     error $ "tir: tirArrayStore: type mismatch1: " ++ show (varType array)
+  --   when (varType idx /= LT.i32) $
+  --     error $ "tir: tirArrayStore: type mismatch2: " ++ show (varType idx)
+  --   when (varType value /= t) $
+  --     error $ "tir: tirArrayStore: type mismatch3: " ++ show t
+  --   case mask of
+  --     Just m -> do
+  --       nv <- newvar LT.i32
+  --       return [ IROp And nv value (LT.i32Value m)
+  --              , IRStore (RTArrayIndex idx t) array nv ]
+  --     _ -> return [IRStore (RTArrayIndex idx t) array value]
 
-  tirArrayLoad :: VarType -> Maybe Int32 {- Mask -} -> ParseState [MateIR Var O O]
-  tirArrayLoad t mask = do
-    idx <- apop
-    array <- apop
-    when (varType array /= JRef) $ error "tir: aaload: type mismatch1"
-    when (varType idx /= JInt) $ error "tir: aaload: type mismatch2"
-    nv <- newvar t
-    apush nv
-    case mask of
-      Just m -> do
-        _ <- apop
-        nv' <- newvar JInt
-        apush nv'
-        return [ IRLoad (RTArrayIndex idx t) array nv
-               , IROp And nv' nv (JIntValue m)]
-      _ -> return [IRLoad (RTArrayIndex idx t) array nv]
+  -- tirInvoke :: CallType -> Word16 -> ParseState [MateIR Var O O]
+  -- tirInvoke ct ident = do
+  --   cls <- classf <$> get
+  --   let (varts, mret) = methodType (ct /= CallStatic) cls ident
+  --   pushes <- tracePipe (printf "tirInvoke: varts: %s returns %s\n" (show varts) (show mret)) $
+  --             forM (reverse $ zip varts [0..]) $ \(x, nr) -> do
+  --     y <- apop
+  --     unless (x == varType y) $ error "invoke: type mismatch"
+  --     case x of
+  --       LT.i32 -> return $ IRPush nr y
+  --       LT.ptr -> return $ IRPush nr y
+  --       LT.float -> do
+  --         let nr8 = fromIntegral nr
+  --         let nri = fromIntegral nr
+  --         let assign = preFloats !! nri
+  --         modify (\s -> s { preRegs = M.insert
+  --                                     (VR assign LT.float)
+  --                                     (HFReg $ XMMReg nr8)
+  --                                     (preRegs s) })
+  --         return $ IROp Add (VReg (VR assign x)) y (LT.floatValue 0) -- mov
+  --   (targetreg, maybemov) <- case mret of
+  --     Just x -> do
+  --       let prereg = case x of
+  --                       LT.i32 -> preeax
+  --                       LT.float -> prexmm7
+  --                       LT.ptr -> preeax
+  --       let nv = VReg (VR prereg x)
+  --       movtarget <- newvar x
+  --       tracePipe (printf "return: %s@%s\n" (show prereg) (show x)) $
+  --         apush movtarget
+  --       return (Just nv, Just $ IROp Add movtarget nv (LT.i32Value 0))
+  --     Nothing -> return (Nothing, Nothing)
+  --   let r =  IRPrep SaveRegs [] : pushes ++
+  --           [IRInvoke (RTPoolCall ident []) targetreg ct, IRPrep RestoreRegs []]
+  --   case maybemov of
+  --     Nothing -> return r
+  --     Just m -> return $ r ++ [m]
 
-  tirArrayStore :: VarType -> Maybe Int32 {- Mask -} -> ParseState [MateIR Var O O]
-  tirArrayStore t mask = do
-    value <- apop
-    idx <-   apop
-    array <- apop
-    when (varType array /= JRef) $
-      error $ "tir: tirArrayStore: type mismatch1: " ++ show (varType array)
-    when (varType idx /= JInt) $
-      error $ "tir: tirArrayStore: type mismatch2: " ++ show (varType idx)
-    when (varType value /= t) $
-      error $ "tir: tirArrayStore: type mismatch3: " ++ show t
-    case mask of
-      Just m -> do
-        nv <- newvar JInt
-        return [ IROp And nv value (JIntValue m)
-               , IRStore (RTArrayIndex idx t) array nv ]
-      _ -> return [IRStore (RTArrayIndex idx t) array value]
+  -- maybeArgument :: Word8 -> VarType -> ParseState Var
+  -- maybeArgument x t = do
+  --   meth <- method <$> get
+  --   let genVReg :: (Disp -> HVarX86) -> VRegNR
+  --               -> Word8 -> VarType
+  --               -> (VirtualReg, HVarX86)
+  --       genVReg constructor a w8 t' =
+  --         (VR a t'
+  --         ,constructor . Disp . (+ (3 * ptrSize)) . fromIntegral $ (ptrSize * w8))
+  --   if x < methodArgs meth
+  --     then do
+  --       ((tup'k, tup'v), assign') <- case t of
+  --        LT.float -> do
+  --          let assign = preFloats !! fromIntegral x
+  --          let tup = (VR assign LT.float, HFReg . XMMReg . fromIntegral $ x)
+  --          return (tup, assign)
+  --        _ -> do
+  --          let assign = preArgs !! fromIntegral x
+  --          let constr = case t of
+  --                   LT.ptr -> SpillIReg
+  --                   LT.i32 -> SpillIReg
+  --                   LT.float -> error "can't happen"
+  --          let tup = genVReg constr assign x LT.i32
+  --          return (tup, assign)
+  --       modify (\s -> s { preRegs = M.insert tup'k tup'v (preRegs s) })
+  --       return $ VReg (VR assign' t)
+  --     else return $ VReg (VR (fromIntegral x) t)
 
-  tirInvoke :: CallType -> Word16 -> ParseState [MateIR Var O O]
-  tirInvoke ct ident = do
-    cls <- classf <$> get
-    let (varts, mret) = methodType (ct /= CallStatic) cls ident
-    pushes <- tracePipe (printf "tirInvoke: varts: %s returns %s\n" (show varts) (show mret)) $
-              forM (reverse $ zip varts [0..]) $ \(x, nr) -> do
-      y <- apop
-      unless (x == varType y) $ error "invoke: type mismatch"
-      case x of
-        JInt -> return $ IRPush nr y
-        JRef -> return $ IRPush nr y
-        JFloat -> do
-          let nr8 = fromIntegral nr
-          let nri = fromIntegral nr
-          let assign = preFloats !! nri
-          modify (\s -> s { preRegs = M.insert
-                                      (VR assign JFloat)
-                                      (HFReg $ XMMReg nr8)
-                                      (preRegs s) })
-          return $ IROp Add (VReg (VR assign x)) y (JFloatValue 0) -- mov
-    (targetreg, maybemov) <- case mret of
-      Just x -> do
-        let prereg = case x of
-                        JInt -> preeax
-                        JFloat -> prexmm7
-                        JRef -> preeax
-        let nv = VReg (VR prereg x)
-        movtarget <- newvar x
-        tracePipe (printf "return: %s@%s\n" (show prereg) (show x)) $
-          apush movtarget
-        return (Just nv, Just $ IROp Add movtarget nv (JIntValue 0))
-      Nothing -> return (Nothing, Nothing)
-    let r =  IRPrep SaveRegs [] : pushes ++
-            [IRInvoke (RTPoolCall ident []) targetreg ct, IRPrep RestoreRegs []]
-    case maybemov of
-      Nothing -> return r
-      Just m -> return $ r ++ [m]
+  -- Generate a named local variable name for each possible local variable
+  setupLocals :: ParseState ()
+  setupLocals = do
+    -- For each maximum locals, generate a name for it in advance
+    maxLocals <- J.codeMaxLocals <$> gets method
+    names <- forM [0..maxLocals-1] $ \i -> do
+      let name = LN.mkName ("L" ++ show i)
+      appendInstruction $ name LI.:= alloca LT.i32
+      return name
+    modify $ \s -> s { localVariableNames = names }
 
-  maybeArgument :: Word8 -> VarType -> ParseState Var
-  maybeArgument x t = do
-    meth <- method <$> get
-    let genVReg :: (Disp -> HVarX86) -> VRegNR
-                -> Word8 -> VarType
-                -> (VirtualReg, HVarX86)
-        genVReg constructor a w8 t' =
-          (VR a t'
-          ,constructor . Disp . (+ (3 * ptrSize)) . fromIntegral $ (ptrSize * w8))
-    if x < methodArgs meth
-      then do
-        ((tup'k, tup'v), assign') <- case t of
-         JFloat -> do
-           let assign = preFloats !! fromIntegral x
-           let tup = (VR assign JFloat, HFReg . XMMReg . fromIntegral $ x)
-           return (tup, assign)
-         _ -> do
-           let assign = preArgs !! fromIntegral x
-           let constr = case t of
-                    JRef -> SpillIReg
-                    JInt -> SpillIReg
-                    JFloat -> error "can't happen"
-           let tup = genVReg constr assign x JInt
-           return (tup, assign)
-        modify (\s -> s { preRegs = M.insert tup'k tup'v (preRegs s) })
-        return $ VReg (VR assign' t)
-      else return $ VReg (VR (fromIntegral x) t)
+  -- Obtains the local variable at requested index
+  getLocal :: Integral a => a -> CFG LN.Name
+  getLocal idx = (!! fromIntegral idx) <$> gets localVariableNames
 
-
-  tirLoad' :: Word8 -> VarType -> ParseState ()
+  tirLoad' :: Word8 -> LT.Type -> ParseState ()
   tirLoad' x t = do
     vreg <- maybeArgument x t
     apush vreg
 
   nul :: VarType -> Var
   nul t = case t of
-    JInt -> JIntValue 0
-    JFloat -> JFloatValue 0
-    JRef -> JRefNull
+    LT.i32 -> LT.i32Value 0
+    LT.float -> LT.floatValue 0
+    LT.ptr -> LT.ptrNull
 
   tirLoad :: Word8 -> VarType -> ParseState [MateIR Var O O]
   tirLoad x t = do
