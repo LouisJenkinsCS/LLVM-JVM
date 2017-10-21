@@ -18,6 +18,7 @@ module LLVMFrontend.Helpers where
   import qualified LLVM.AST.Operand as LO
   import qualified LLVM.AST.Name as LN
   import qualified LLVM.AST.Type as LT
+  import qualified LLVM.AST.Float as LF
 
   -- Used in generation of LLVM backend code
   newtype LLVM a = LLVM (State AST.Module a)
@@ -50,6 +51,9 @@ module LLVMFrontend.Helpers where
   -- 32-bit integer constant
   int :: Integral a => a -> LC.Constant
   int = LC.Int 32 . fromIntegral
+
+  float :: Float -> LC.Constant
+  float = LC.Float . LF.Single
 
   add :: Operand -> Operand -> Instruction
   add a b = LI.Add False False a b []

@@ -35,6 +35,7 @@ import LLVM.Target
 import qualified LLVM.Module as Mod
 import LLVM.PassManager
 import LLVMFrontend.Helpers
+import LLVMFrontend.MkGraph
 
 foreign import ccall "dynamic"
    code_void :: FunPtr (IO ()) -> IO ()
@@ -98,6 +99,11 @@ compileMethod :: B.ByteString -> MethodSignature -> Class Direct -> IO (a,b)
 compileMethod name sig cls = do
   let meth = fromJust $ lookupMethod name cls
   let code = M.fromList (arlist (methodAttributes meth)) M.! "Code"
+  addExceptionBlocks
+  resolveReferences
+  resetPC jvminsn
+  gs <- mkBlocks
+  mkMethod $ L.foldl' (|*><*|) emptyClosedGraph gs
   cfg <- parseCFG (decodeMethod code)
   let mod = AST.defaultModule { AST.moduleDefinitions = [defineFn AST.VoidType "main" (basicBlocks cfg)], AST.moduleName = "Dummy" }
   ast <- compileMethod' mod

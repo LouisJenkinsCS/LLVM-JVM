@@ -1,4 +1,5 @@
 {-RIPPED FROM MATEVM-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
 module LLVMFrontend.MkGraph
@@ -45,6 +46,7 @@ module LLVMFrontend.MkGraph
   import qualified LLVM.AST.Operand as LO
   import qualified LLVM.AST.Name as LN
   import qualified LLVM.AST.Type as LT
+  import qualified LLVM.AST.Float as LF
   import LLVMFrontend.Helpers
 
   -- import Debug.Trace
@@ -52,7 +54,9 @@ module LLVMFrontend.MkGraph
   data ParseState' = ParseState'
     { labels :: M.Map Int32 LN.Name {- store offset -> label -}
     , nBlocks :: Int
+    , basicBlocks :: [LG.BasicBlock]
     , blockEntries :: S.Set Int32 {- store block entries (data gained from first pass) -}
+    , localVariableNames :: [LN.Name]
 
     , pcOffset :: Int32 {- programm counter -}
     , operandStack :: [LO.Operand] {- simulation stack -}
@@ -71,17 +75,6 @@ module LLVMFrontend.MkGraph
 
   type ParseState a = State ParseState' a
 
-  -- Appends an instruction to the specified basic block by creating a copy containing
-  -- the requested instruction.
-  appendInstruction :: LI.Named LI.Instruction -> ParseState ()
-  appendInstruction instr = do
-    block <- head <$> gets basicBlocks
-    updateCurrentBlock $ appendInstruction' instr block
-
-    where
-      appendInstruction' i (LG.BasicBlock n is t) = LG.BasicBlock n (is ++ [i]) t
-
-
   -- Generate Basic Block name
   generateBasicBlockName :: ParseState LN.Name
   generateBasicBlockName = do
@@ -93,9 +86,9 @@ module LLVMFrontend.MkGraph
   addExceptionBlocks :: ParseState ()
   addExceptionBlocks = do
     -- Each exception handler has incoming edges from any pc ∈ [pcStart, pcEnd]...
-    hstarts <- gets S.toList . handlerStarts
+    hstarts <- gets $ S.toList . handlerStarts
     forM_ hstarts addPC
-    exKeys <- gets IM.keys . exceptionMap
+    exKeys <- gets $ IM.keys . exceptionMap
     -- The beginning of the try-block, pcStart, contains an incoming edge from the
     -- basic block preceeding us.
     forM_ (map IIM.lowerBound exKeys) addPC
@@ -157,10 +150,10 @@ module LLVMFrontend.MkGraph
 
 
   mkMethod :: ParseState ()
-  mkMethod g = do
-    hs <- handlerStarts <$> get
+  mkMethod = do
+    hs <- gets handlerStarts
     -- Create labels for each exception handler, as well as for the entry block.
-    forM_ addLabel (S.toList hs ++ [0])
+    forM_ (S.toList hs ++ [0]) addLabel
     return ()
 
   mkBlocks :: ParseState ()
@@ -170,7 +163,7 @@ module LLVMFrontend.MkGraph
     jvminsn <- instructions <$> get
 
     if null jvminsn
-      then return []
+      then return ()
       else if S.member pc entries
         then do
           mkBlock
@@ -191,9 +184,9 @@ module LLVMFrontend.MkGraph
     -- Compute the exception handlers that we are apart of. As there cna be nested
     -- exception handlers/try-catch blocks, we end up with a list of the ones we
     -- are contained in.
-    let extable = map (second fromIntegral)
-                  $ concatMap snd
-                  $ handlermap `IM.containing` pc
+    -- let extable = map (second fromIntegral)
+    --               $ concatMap snd
+    --               $ handlermap `IM.containing` pc
     -- let f' = IRLabel l extable handlerStart
     -- fixup block boundaries
     -- be <- -- trace (printf "pc: %d\nhstart: %s\nextable: %s\n" pc (show handlerStart) (show extable)) $
@@ -204,7 +197,7 @@ module LLVMFrontend.MkGraph
     --                nv <- newvar $ varType x
     --                apush nv
     --                return $ IROp Add nv x (nul (varType x))
-    (ms', l') <- toMid
+    toMid
     -- mkFirst f' <*> mkMiddles (fixup ++ ms') <*> mkLast l'
     return ()
 
@@ -252,7 +245,7 @@ module LLVMFrontend.MkGraph
           -- Points to an instruction, map to IR...
           insIR <- tir ins
           incrementPC ins
-          first (insIR ++) <$> toMid
+          toMid
     where
       -- Handle conditional and unconditional jumps here. We create the appropriate
       -- basic blocks for the instructions as well.
@@ -295,8 +288,8 @@ module LLVMFrontend.MkGraph
             -- next <- addLabel (pc + insnLength ins)
             insIR <- tir ins
             error $ "Processing instruction: " ++ show insIR
-        fixups <- handleBlockEnd
-        return (ret1 ++ fixups, ret2)
+        -- fixups <- handleBlockEnd
+        return ()
         where
           -- Return the top operand (after performing type-checking)
           returnSomething t = do
@@ -415,13 +408,13 @@ module LLVMFrontend.MkGraph
   fieldType2VarType CharByte = LT.i8
   fieldType2VarType BoolType = LT.i1
   fieldType2VarType FloatType = LT.float
-  fieldType2VarType (ObjectType _) = LT.ptr
-  fieldType2VarType (Array _ _) = LT.ptr -- fieldType2VarType ty -- TODO
+  fieldType2VarType (ObjectType _) = LT.i64
+  fieldType2VarType (Array _ _) = LT.i64 -- fieldType2VarType ty -- TODO
   fieldType2VarType x = error $ "fieldType2VarType: " ++ show x
 
   -- tir = transform to IR
   -- TODO: Convert this to create LLVM...
-  tir :: J.Instruction -> ParseState [LI.Instruction]
+  tir :: J.Instruction -> ParseState ()
   -- tir ACONST_NULL = do apush LT.ptrNull; return []
   tir ICONST_M1 = tir (BIPUSH 0xff) -- (-1)
   tir ICONST_0 = tir (BIPUSH 0)
@@ -430,31 +423,31 @@ module LLVMFrontend.MkGraph
   tir ICONST_3 = tir (BIPUSH 3)
   tir ICONST_4 = tir (BIPUSH 4)
   tir ICONST_5 = tir (BIPUSH 5)
-  tir (BIPUSH x) = do apush $ LO.ConstantOperand $ int x; return []
-  tir (SIPUSH x) = do apush $ LO.ConstantOperand $ int x; return []
-  tir FCONST_0 =  do apush $ LO.ConstantOperand $ LC.Float 0; return []
-  tir FCONST_1 =  do apush $ LO.ConstantOperand $ LC.Float 1; return []
-  tir FCONST_2 =  do apush $ LO.ConstantOperand $ LC.Float 3; return []
+  tir (BIPUSH x) = apush $ cons $ int x
+  tir (SIPUSH x) = apush $ cons $ int x
+  tir FCONST_0 =  apush $ cons $ LC.Float . LF.Single $ 0
+  tir FCONST_1 =  apush $ cons $ LC.Float . LF.Single $ 1
+  tir FCONST_2 =  apush $ cons $ LC.Float . LF.Single $ 3
   tir (ILOAD_ x) = tir (ILOAD (imm2num x))
-  tir (ILOAD x) = tirLoad x LT.i32 -- tirLoad' x LT.i32; return []
-  tir (IINC x con) = do
-    tirLoad' x LT.i32
-    y <- apop
-    nv <- newvar LT.i32
-    apush nv
-    storeinsn <- tirStore x LT.i32
-    error "Not Supported"
+  tir (ILOAD x) = tirLoad' x LT.i32 -- tirLoad' x LT.i32; return []
+  -- tir (IINC x con) = do
+  --   tirLoad' x LT.i32
+  --   y <- apop
+  --   nv <- newvar LT.i32
+  --   apush nv
+  --   storeinsn <- tirStore x LT.i32
+  --   error "Not Supported"
     -- return $ IROp Add nv y (LT.i32Value (w8Toi32 con)) : storeinsn
   tir (ALOAD_ x) = tir (ALOAD (imm2num x))
-  tir (ALOAD x) = tirLoad x LT.ptr
+  tir (ALOAD x) = tirLoad' x LT.i64
   tir (FLOAD_ x) = tir (FLOAD (imm2num x))
-  tir (FLOAD x) = tirLoad x LT.float
+  tir (FLOAD x) = tirLoad' x LT.float
   tir (ISTORE_ x) = tir (ISTORE (imm2num x))
   tir (ISTORE y) = tirStore y LT.i32
   tir (FSTORE_ y) = tir (FSTORE (imm2num y))
   tir (FSTORE y) = tirStore y LT.float
   tir (ASTORE_ x) = tir (ASTORE (imm2num x))
-  tir (ASTORE x) = tirStore x LT.ptr
+  tir (ASTORE x) = tirStore x LT.i64
   tir (PUTFIELD x) = do
     error "Not Supported"
     -- src <- apop
@@ -481,24 +474,24 @@ module LLVMFrontend.MkGraph
     error "Not Supported"
     -- y <- apop
     -- return [IRStore (RTPool x) LT.ptrNull y]
-  tir (LDC1 x) = tir (LDC2 (fromIntegral x))
-  tir (LDC2 x) = do
-    cls <- classf <$> get
-    let valuetype = case constsPool cls M.! x of
-              (CString _) -> LT.ptr
-              (CInteger _) -> LT.i32
-              e -> error $ "tir: LDCI... missing impl.: " ++ show e
-    nv <- newvar valuetype
-    apush nv
-    error "Not Supported..."
+  -- tir (LDC1 x) = tir (LDC2 (fromIntegral x))
+  -- tir (LDC2 x) = do
+  --   cls <- classf <$> get
+  --   let valuetype = case constsPool cls M.! x of
+  --             (CString _) -> LT.i64
+  --             (CInteger _) -> LT.i32
+  --             e -> error $ "tir: LDCI... missing impl.: " ++ show e
+  --   nv <- newvar
+  --   apush nv
+  --   error "Not Supported..."
     -- return [IRLoad (RTPool x) LT.ptrNull nv]
   tir (NEW x) = do
     error "Not Supported"
     -- nv <- newvar LT.ptr
     -- apush nv
     -- return [IRLoad (RTPoolCall x []) LT.ptrNull nv]
-  tir (ANEWARRAY _) = tirArray ReferenceType 10 -- for int. TODO?
-  tir (NEWARRAY w8) = tirArray PrimitiveType w8
+  -- tir (ANEWARRAY _) = tirArray ReferenceType 10 -- for int. TODO?
+  -- tir (NEWARRAY w8) = tirArray PrimitiveType w8
   tir ARRAYLENGTH = do
     error "Not Supported"
     -- array <- apop
@@ -506,12 +499,12 @@ module LLVMFrontend.MkGraph
     -- nv <- newvar LT.i32
     -- apush nv
     -- return [IRLoad RTArrayLength array nv]
-  tir AALOAD = tirArrayLoad LT.ptr Nothing
-  tir IALOAD = tirArrayLoad LT.i32 Nothing
-  tir CALOAD = tirArrayLoad LT.i32 (Just 0xff)
-  tir AASTORE = tirArrayStore LT.ptr Nothing
-  tir IASTORE = tirArrayStore LT.i32 Nothing
-  tir CASTORE = tirArrayStore LT.i32 (Just 0xff)
+  -- tir AALOAD = tirArrayLoad LT.ptr Nothing
+  -- tir IALOAD = tirArrayLoad LT.i32 Nothing
+  -- tir CALOAD = tirArrayLoad LT.i32 (Just 0xff)
+  -- tir AASTORE = tirArrayStore LT.ptr Nothing
+  -- tir IASTORE = tirArrayStore LT.i32 Nothing
+  -- tir CASTORE = tirArrayStore LT.i32 (Just 0xff)
   tir DUP = do
     error "Not Supported"
     -- x <- apop
@@ -535,24 +528,28 @@ module LLVMFrontend.MkGraph
     -- apush nv
     -- apush v3; apush v2; apush v1
     -- return [IROp Add nv v1 (LT.i32Value 0)]
-  tir POP = do apop; return []
-  tir IADD = tirOpInt LI.Add LT.i32
-  tir ISUB = tirOpInt LI.Sub LT.i32
-  tir INEG = do
+  tir POP = do apop; return ()
+  tir IADD = do
     x <- apop
-    apush (LO.ConstantOperand $ int 0)
-    apush x
-    tirOpInt LI.Sub LT.i32
-  tir IMUL = tirOpInt LI.Mul LT.i32
-  tir IDIV = tirOpInt LI.SDiv LT.i32
-  tir IREM = tirOpInt LI.SRem LT.i32
-  tir IAND = tirOpInt LI.And LT.i32
-  tir IOR = tirOpInt LI.Or LT.i32
-  tir IXOR = tirOpInt LI.Xor LT.i32
-  tir IUSHR = tirOpInt LI.LShr LT.i32
-  tir ISHR = tirOpInt LI.AShr LT.i32
-  tir ISHL = tirOpInt LI.Shl LT.i32
-  tir FADD = tirOpInt LI.Add LT.float
+    y <- apop
+    tmp <- newvar
+    appendInstruction $ tmp LI.:= LLVMFrontend.Helpers.add x y
+  -- tir ISUB = tirOpInt LI.Sub LT.i32
+  -- tir INEG = do
+  --   x <- apop
+  --   apush (LO.ConstantOperand $ int 0)
+  --   apush x
+  --   tirOpInt LI.Sub LT.i32
+  -- tir IMUL = tirOpInt LI.Mul LT.i32
+  -- tir IDIV = tirOpInt LI.SDiv LT.i32
+  -- tir IREM = tirOpInt LI.SRem LT.i32
+  -- tir IAND = tirOpInt LI.And LT.i32
+  -- tir IOR = tirOpInt LI.Or LT.i32
+  -- tir IXOR = tirOpInt LI.Xor LT.i32
+  -- tir IUSHR = tirOpInt LI.LShr LT.i32
+  -- tir ISHR = tirOpInt LI.AShr LT.i32
+  -- tir ISHL = tirOpInt LI.Shl LT.i32
+  -- tir FADD = tirOpInt LI.Add LT.float
   tir I2C = do
     error "Not Supported"
     -- x <- apop
@@ -692,11 +689,67 @@ module LLVMFrontend.MkGraph
   --       return $ VReg (VR assign' t)
   --     else return $ VReg (VR (fromIntegral x) t)
 
+  -- Get next numeric identifier for a new temporary
+  nextTemp :: Integral a => ParseState a
+  nextTemp = do
+    curr <- gets autotmpN
+    modify $ \s -> s { autotmpN = curr + 1 }
+    return . fromIntegral $ curr
+
+  -- Pushes a constant on the operand stack.
+  pushConstant :: LC.Constant -> ParseState ()
+  pushConstant cons =
+    -- An LLVM constant must be first converted into a ConstantOperand
+    pushOperand $ LO.ConstantOperand cons
+
+  -- Pushes an operand on the operand stack.
+  pushOperand :: LO.Operand -> ParseState ()
+  pushOperand op = do
+    ops <- gets operandStack
+    modify $ \s -> s { operandStack = op : ops }
+
+  -- Pops a constant off the operand stack...
+  -- Note that the caller must know the type of the actual operand
+  popOperand :: ParseState LO.Operand
+  popOperand = do
+    ops <- gets operandStack
+    let op = head ops
+    modify $ \s -> s { operandStack = tail ops }
+    return op
+
+  updateCurrentBlock :: LG.BasicBlock -> ParseState ()
+  updateCurrentBlock b = do
+    blocks <- gets basicBlocks
+    modify $ \s -> s { basicBlocks = b : tail blocks }
+
+  -- Sets the current terminator of this basic block. The terminator is an terminal
+  -- operation (I.E one that is the very last instruction to be called) and generally
+  -- results in branching of control flow or a return statement
+  setTerminator :: LI.Named LI.Terminator -> ParseState ()
+  setTerminator term = do
+    block <- head <$> gets basicBlocks
+    updateCurrentBlock $ setTerminator' term block
+
+    where
+      setTerminator' term (LG.BasicBlock n i t) = LG.BasicBlock n i term
+
+  -- Appends an instruction to the specified basic block by creating a copy containing
+  -- the requested instruction.
+  appendInstruction :: LI.Named LI.Instruction -> ParseState ()
+  appendInstruction instr = do
+    block <- head <$> gets basicBlocks
+    updateCurrentBlock $ appendInstruction' instr block
+
+    where
+      appendInstruction' i (LG.BasicBlock n is t) = LG.BasicBlock n (is ++ [i]) t
+
   -- Generate a named local variable name for each possible local variable
   setupLocals :: ParseState ()
   setupLocals = do
     -- For each maximum locals, generate a name for it in advance
-    maxLocals <- J.codeMaxLocals <$> gets method
+    meth <- gets method
+    let code = M.fromList (arlist (methodAttributes meth)) M.! "Code"
+    let maxLocals = J.codeMaxLocals $ decodeMethod code
     names <- forM [0..maxLocals-1] $ \i -> do
       let name = LN.mkName ("L" ++ show i)
       appendInstruction $ name LI.:= alloca LT.i32
@@ -704,59 +757,46 @@ module LLVMFrontend.MkGraph
     modify $ \s -> s { localVariableNames = names }
 
   -- Obtains the local variable at requested index
-  getLocal :: Integral a => a -> CFG LN.Name
+  getLocal :: Integral a => a -> ParseState LN.Name
   getLocal idx = (!! fromIntegral idx) <$> gets localVariableNames
 
   tirLoad' :: Word8 -> LT.Type -> ParseState ()
   tirLoad' x t = do
-    vreg <- maybeArgument x t
-    apush vreg
+    tmpName <- LN.UnName <$> nextTemp
+    name <- (!! fromIntegral x) <$> gets localVariableNames
+    appendInstruction $ tmpName LI.:= load (local t name)
+    pushOperand $ LO.LocalReference LT.i32 tmpName
 
-  nul :: VarType -> Var
+  nul :: LT.Type -> LO.Operand
   nul t = case t of
-    LT.i32 -> LT.i32Value 0
-    LT.float -> LT.floatValue 0
-    LT.ptr -> LT.ptrNull
-
-  tirLoad :: Word8 -> VarType -> ParseState [MateIR Var O O]
-  tirLoad x t = do
-    tirLoad' x t
-    vreg <- apop
-    nv <- newvar t
-    apush nv
-    return [IROp Add nv vreg (nul t)]
+    i32 -> cons $ int 0
+    float -> cons $ LC.Float . LF.Single $ 0
+    ptr -> cons $ int 0
 
 
-  tirStore :: Word8 -> VarType -> ParseState[MateIR Var O O]
+  tirStore :: Word8 -> LT.Type -> ParseState ()
   tirStore w8 t = do
     x <- apop
-    unless (t == varType x) $ error "tirStore: type mismatch"
-    vreg <- maybeArgument w8 t
-    return [IROp Add vreg x (nul t)]
+    localName <- getLocal w8
+    storeInstr <- store (local t localName) <$> popOperand
+    appendInstruction (LI.Do storeInstr)
 
-  tirOpInt :: OpType -> VarType -> ParseState [MateIR Var O O]
-  tirOpInt op t = do
-    x <- apop; y <- apop
-    nv <- newvar t; apush nv
-    unless (t == varType x && t == varType y) $ error "tirOpInt: type mismatch"
-    return [IROp op nv x y]
-
-  newvar :: VarType -> ParseState Var
-  newvar t = do
+  newvar :: ParseState LN.Name
+  newvar = do
     sims <- get
-    put $ sims { regcnt = regcnt sims + 1 }
-    return $ VReg (VR (regcnt sims) t)
+    put $ sims { autotmpN = autotmpN sims + 1 }
+    LN.UnName <$> nextTemp
 
-  apush :: Var -> ParseState ()
+  apush :: LO.Operand -> ParseState ()
   apush x = do
-    s <- stack <$> get
+    s <- gets operandStack
     sims <- get
-    put $ sims { stack = x : s }
+    put $ sims { operandStack = x : s }
 
-  apop :: ParseState Var
+  apop :: ParseState LO.Operand
   apop = do
-    simstack <- stack <$> get
+    simstack <- gets operandStack
     when (null simstack) $ error "apop: stack is empty"
-    (s:ss) <- stack <$> get
-    modify (\m -> m { stack = ss })
+    (s:ss) <- gets operandStack
+    modify (\m -> m { operandStack = ss })
     return s
