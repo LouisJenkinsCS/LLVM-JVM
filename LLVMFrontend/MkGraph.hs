@@ -9,6 +9,7 @@ module LLVMFrontend.MkGraph
   , resetPC
   , mkBlocks
   , mkMethod
+  , pipeline
   ) where
 
   import qualified Data.List as L
@@ -29,7 +30,7 @@ module LLVMFrontend.MkGraph
   import qualified JVM.Assembler as J
   import JVM.Assembler hiding (Instruction)
   import JVM.ClassFile
-  import Harpy hiding (Label, fst)
+  import JVM.Converter
 
   import MateVMRuntime.Debug
   import MateVMRuntime.Types
@@ -74,6 +75,89 @@ module LLVMFrontend.MkGraph
     }
 
   type ParseState a = State ParseState' a
+
+  pipeline :: Class Direct -> Method Direct -> [J.Instruction] -> IO ()
+  pipeline cls meth jvminsn = do
+    prettyHeader "JVM Input"
+    mapM_ (printfPipe . printf "\t%s\n" . show) jvminsn
+    prettyHeader "Code Generation"
+    action <- return . runAll $ do
+      setupLocals
+      addExceptionBlocks
+      resolveReferences
+      resetPC jvminsn
+      gs <- mkBlocks
+      mkMethod
+      lbls <- gets labels
+      n <- gets nBlocks
+      bb <- gets basicBlocks
+      error $ "Labels: " ++ show lbls ++ ", nBlocks: " ++ show n ++ ", basicBlocks: " ++ show bb
+    seq action (return True)
+    return ()
+    where
+      mname = methodName meth
+      codeseg = fromMaybe
+                (error $ "codeseg " ++ (show . toString) mname ++ " not found")
+                (attrByName meth "Code")
+      decoded = decodeMethod codeseg
+      exmap :: ExceptionMap Int32
+      exmap = L.foldl' f IM.empty $ codeExceptions decoded
+        where
+          f emap ce =
+            if IM.member key emap
+              -- build list in reverse order, since matching order is important
+              then IM.adjust (++ [value]) key emap
+              else IM.insert key [value] emap
+              where
+                -- decrement end by one to get correct ranges
+                key = IM.ClosedInterval (fromIntegral $ eStartPC ce)
+                                        (fromIntegral $ eEndPC ce - 1)
+                value = (&&&) g (fromIntegral . eHandlerPC) ce
+                  where
+                    g ce' = case eCatchType ce' of
+                        0 -> B.empty
+                        x -> buildClassID cls x
+                          where
+                            buildClassID :: Class Direct -> Word16 -> B.ByteString
+                            buildClassID cls idx = cl
+                              where (CClass cl) = constsPool cls M.! idx
+      hstarts :: S.Set Int32
+      hstarts = S.fromList $ map (fromIntegral . eHandlerPC)
+                           $ codeExceptions decoded
+      initstate :: ParseState'
+      initstate = ParseState' { labels = M.empty
+                              , blockEntries = S.empty
+                              , nBlocks = 0
+                              , pcOffset = 0
+                              , operandStack = []
+                              , classf = cls
+                              , method = meth
+                              , basicBlocks = []
+                              , localVariableNames = []
+                              , autotmpN = 0
+                              , instructions = jvminsn
+                              , exceptionMap = exmap
+                              , handlerStarts = hstarts }
+      runAll prog = runStateT prog initstate
+
+  prettyHeader :: String -> IO ()
+  prettyHeader str = do
+    let len = length str + 6
+    printfPipe $ printf "%s\n" (replicate len ' ')
+    printfPipe $ printf "-- %s --\n" str
+    printfPipe $ printf "%s\n" (replicate len ' ')
+
+  -- compileMethod :: B.ByteString -> MethodSignature -> Class Direct -> IO (NativeWord, TrapMap)
+  -- compileMethod meth sig cls =
+  --   case lookupMethodWithSig meth sig cls of
+  --     Just m -> do
+  --       let c = codeInstructions $ decodeMethod $ fromMaybe (error "no code seg") (attrByName m "Code")
+  --       pipeline cls m c
+  --     Nothing -> error $ "lookupMethod: " ++ show meth
+  --   where
+  --     lookupMethodWithSig :: B.ByteString -> MethodSignature -> Class Direct -> Maybe (Method Direct)
+  --     lookupMethodWithSig name sig cls =
+  --       L.find (\x -> methodName x == name && methodSignature x == sig) $ classMethods cls
 
   -- Generate Basic Block name
   generateBasicBlockName :: ParseState LN.Name
@@ -577,7 +661,7 @@ module LLVMFrontend.MkGraph
   --   apop; return []
   -- tir MONITOREXIT = do -- TODO: stub!
   --   apop; return []
-  -- tir x = error $ "tir: " ++ show x
+  tir x = error $ "tir: " ++ show x
 
   tirArray :: MateObjType -> Word8 -> ParseState ()
   tirArray objtype w8 = do
