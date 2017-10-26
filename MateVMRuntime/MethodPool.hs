@@ -26,7 +26,6 @@ import MateVMRuntime.Utilities
 import MateVMRuntime.ClassPool
 import MateVMRuntime.NativeMethods
 
-import LLVMFrontend.CFG
 import qualified LLVM.AST as AST
 import qualified LLVM.ExecutionEngine as EE
 import LLVM.Context
@@ -101,11 +100,11 @@ compileMethod name sig cls = do
   let meth = fromJust $ lookupMethod name cls
   let code = M.fromList (arlist (methodAttributes meth)) M.! "Code"
 
-  pipeline cls meth (codeInstructions . decodeMethod $ code)
+  cfg <- pipeline cls meth (codeInstructions . decodeMethod $ code)
   -- cfg <- parseCFG (decodeMethod code)
-  -- let mod = AST.defaultModule { AST.moduleDefinitions = [defineFn AST.VoidType "main" (basicBlocks cfg)], AST.moduleName = "Dummy" }
-  -- ast <- compileMethod' mod
-  -- error . show $ ast
+  let mod = AST.defaultModule { AST.moduleDefinitions = [defineFn AST.VoidType "main" (basicBlocks cfg)], AST.moduleName = "Dummy" }
+  ast <- compileMethod' mod
+  error . show $ ast
 
   error "JIT Compilation not implemented...\n"
 

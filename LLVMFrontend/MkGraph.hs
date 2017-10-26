@@ -74,26 +74,22 @@ module LLVMFrontend.MkGraph
     , handlerStarts :: S.Set Int32 {- set of handler starts -}
     }
 
-  type ParseState a = State ParseState' a
+  type ParseState a = StateT ParseState' IO a
 
-  pipeline :: Class Direct -> Method Direct -> [J.Instruction] -> IO ()
+  pipeline :: Class Direct -> Method Direct -> [J.Instruction] -> IO ParseState'
   pipeline cls meth jvminsn = do
     prettyHeader "JVM Input"
     mapM_ (printfPipe . printf "\t%s\n" . show) jvminsn
     prettyHeader "Code Generation"
-    action <- return . runAll $ do
+    action <- liftIO $ runAll $ do
       setupLocals
       addExceptionBlocks
       resolveReferences
       resetPC jvminsn
       gs <- mkBlocks
       mkMethod
-      lbls <- gets labels
-      n <- gets nBlocks
-      bb <- gets basicBlocks
-      error $ "Labels: " ++ show lbls ++ ", nBlocks: " ++ show n ++ ", basicBlocks: " ++ show bb
     seq action (return True)
-    return ()
+    return action
     where
       mname = methodName meth
       codeseg = fromMaybe
@@ -132,13 +128,13 @@ module LLVMFrontend.MkGraph
                               , operandStack = []
                               , classf = cls
                               , method = meth
-                              , basicBlocks = []
+                              , basicBlocks = [LG.BasicBlock (LN.Name "entry") [] retvoid]
                               , localVariableNames = []
                               , autotmpN = 0
                               , instructions = jvminsn
                               , exceptionMap = exmap
                               , handlerStarts = hstarts }
-      runAll prog = runStateT prog initstate
+      runAll prog = execStateT prog initstate
 
   prettyHeader :: String -> IO ()
   prettyHeader str = do
@@ -507,11 +503,11 @@ module LLVMFrontend.MkGraph
   tir ICONST_3 = tir (BIPUSH 3)
   tir ICONST_4 = tir (BIPUSH 4)
   tir ICONST_5 = tir (BIPUSH 5)
-  tir (BIPUSH x) = apush $ cons $ int x
-  tir (SIPUSH x) = apush $ cons $ int x
-  tir FCONST_0 =  apush $ cons $ LC.Float . LF.Single $ 0
-  tir FCONST_1 =  apush $ cons $ LC.Float . LF.Single $ 1
-  tir FCONST_2 =  apush $ cons $ LC.Float . LF.Single $ 3
+  tir (BIPUSH x) = pushConstant $ int x
+  tir (SIPUSH x) = pushConstant $ int x
+  tir FCONST_0 =  pushConstant $ LC.Float . LF.Single $ 0
+  tir FCONST_1 =  pushConstant $ LC.Float . LF.Single $ 1
+  tir FCONST_2 =  pushConstant $ LC.Float . LF.Single $ 3
   tir (ILOAD_ x) = tir (ILOAD (imm2num x))
   tir (ILOAD x) = tirLoad' x LT.i32 -- tirLoad' x LT.i32; return []
   -- tir (IINC x con) = do
@@ -612,11 +608,12 @@ module LLVMFrontend.MkGraph
     -- apush nv
     -- apush v3; apush v2; apush v1
     -- return [IROp Add nv v1 (LT.i32Value 0)]
-  tir POP = do apop; return ()
+  tir POP = do popOperand; return ()
   tir IADD = do
-    x <- apop
-    y <- apop
+    x <- popOperand
+    y <- popOperand
     tmp <- newvar
+    pushOperand $ LO.LocalReference LT.i32 tmp
     appendInstruction $ tmp LI.:= LLVMFrontend.Helpers.add x y
   -- tir ISUB = tirOpInt LI.Sub LT.i32
   -- tir INEG = do
@@ -777,34 +774,37 @@ module LLVMFrontend.MkGraph
   nextTemp :: Integral a => ParseState a
   nextTemp = do
     curr <- gets autotmpN
-    modify $ \s -> s { autotmpN = curr + 1 }
+    modify' $ \s -> s { autotmpN = curr + 1 }
     return . fromIntegral $ curr
 
   -- Pushes a constant on the operand stack.
   pushConstant :: LC.Constant -> ParseState ()
-  pushConstant cons =
+  pushConstant cons = do
     -- An LLVM constant must be first converted into a ConstantOperand
     pushOperand $ LO.ConstantOperand cons
+    liftIO $ printfPipe $ "Pushed constant: " ++ show cons ++ "\n"
 
   -- Pushes an operand on the operand stack.
   pushOperand :: LO.Operand -> ParseState ()
   pushOperand op = do
     ops <- gets operandStack
-    modify $ \s -> s { operandStack = op : ops }
+    modify' $ \s -> s { operandStack = op : ops }
 
   -- Pops a constant off the operand stack...
   -- Note that the caller must know the type of the actual operand
   popOperand :: ParseState LO.Operand
   popOperand = do
     ops <- gets operandStack
+    when (null ops) $ error "popOperand: stack is empty"
     let op = head ops
-    modify $ \s -> s { operandStack = tail ops }
+    modify' $ \s -> s { operandStack = tail ops }
     return op
 
   updateCurrentBlock :: LG.BasicBlock -> ParseState ()
   updateCurrentBlock b = do
     blocks <- gets basicBlocks
-    modify $ \s -> s { basicBlocks = b : tail blocks }
+    when (null blocks) $ error "No current basic block..."
+    modify' $ \s -> s { basicBlocks = b : tail blocks }
 
   -- Sets the current terminator of this basic block. The terminator is an terminal
   -- operation (I.E one that is the very last instruction to be called) and generally
@@ -842,14 +842,19 @@ module LLVMFrontend.MkGraph
 
   -- Obtains the local variable at requested index
   getLocal :: Integral a => a -> ParseState LN.Name
-  getLocal idx = (!! fromIntegral idx) <$> gets localVariableNames
+  getLocal idx = do
+    let idx' = fromIntegral idx
+    vars <- gets localVariableNames
+    return $ if idx' < length vars then vars !! idx'
+      else error $ "Local variable indexed at " ++ show idx' ++ " when maximum is " ++ (show . length $ vars) ++ "\n"
 
   tirLoad' :: Word8 -> LT.Type -> ParseState ()
   tirLoad' x t = do
     tmpName <- LN.UnName <$> nextTemp
-    name <- (!! fromIntegral x) <$> gets localVariableNames
+    name <- getLocal x
     appendInstruction $ tmpName LI.:= load (local t name)
     pushOperand $ LO.LocalReference LT.i32 tmpName
+    liftIO $ printfPipe $ "Load " ++ show tmpName ++ "\n"
 
   nul :: LT.Type -> LO.Operand
   nul t = case t of
@@ -860,10 +865,10 @@ module LLVMFrontend.MkGraph
 
   tirStore :: Word8 -> LT.Type -> ParseState ()
   tirStore w8 t = do
-    x <- apop
     localName <- getLocal w8
     storeInstr <- store (local t localName) <$> popOperand
     appendInstruction (LI.Do storeInstr)
+    liftIO $ printfPipe $ "Store " ++ show localName ++ "\n"
 
   newvar :: ParseState LN.Name
   newvar = do
