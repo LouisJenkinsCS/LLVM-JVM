@@ -22,6 +22,13 @@ for d in */; do
   # files, so we must cross-compile it...
   for f in *.java; do
     filename=$(basename "${f%.*}")
+
+    # Skip
+    if [ -f "$filename.skip" ]; then
+      echo "Skipping $filename"
+      continue
+    fi
+
     bootstrap=$(locate -r '/rt.jar$')
     javac -target 1.7 -source 1.7 -bootclasspath $bootstrap $f
     ../../Main.exe -cp ../../rt:./ "$filename" 1> tmp.out 2> tmp.err

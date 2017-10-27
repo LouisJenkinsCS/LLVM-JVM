@@ -35,6 +35,7 @@ import qualified LLVM.Module as Mod
 import LLVM.PassManager
 import LLVMFrontend.Helpers
 import LLVMFrontend.MkGraph
+import LLVM.Transforms
 
 
 foreign import ccall "dynamic"
@@ -116,7 +117,7 @@ compileMethod' mod =
       -- Create an LLVM module from the AST generated...
       Mod.withModuleFromAST c mod $ \m ->
         -- Make a simple optimization pass
-        withPassManager defaultCuratedPassSetSpec { optLevel = Just 3, sizeLevel = Just 3 } $ \pm -> do
+        withPassManager defaultPassSetSpec { transforms = [PromoteMemoryToRegister] } $ \pm -> do
           optmod <- Mod.moduleAST m -- Optimized-copy of module
           s <- Mod.moduleLLVMAssembly m -- Convert from module to assembly
           printfJit $ "~~~Original...~~~\n" ++ C8.unpack s
