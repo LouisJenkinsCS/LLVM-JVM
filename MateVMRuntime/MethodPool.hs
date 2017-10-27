@@ -103,7 +103,7 @@ compileMethod name sig cls = do
 
   cfg <- pipeline cls meth (codeInstructions . decodeMethod $ code)
   -- cfg <- parseCFG (decodeMethod code)
-  let mod = AST.defaultModule { AST.moduleDefinitions = [defineFn AST.VoidType "main" (basicBlocks cfg)], AST.moduleName = "Dummy" }
+  let mod = AST.defaultModule { AST.moduleDefinitions = [defineFn AST.VoidType "main" (M.elems $ basicBlocks cfg)], AST.moduleName = "Dummy" }
   ast <- compileMethod' mod
   error . show $ ast
 

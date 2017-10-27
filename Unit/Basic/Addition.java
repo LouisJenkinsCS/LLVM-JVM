@@ -4,5 +4,12 @@ class Addition {
     int y = 0x2000;
     int z = 0x3000;
     int w = x + y + z;
+
+    int result;
+    if (w > x) {
+      result = w;
+    } else {
+      result = x;
+    }
   }
 }

@@ -53,9 +53,9 @@ module LLVMFrontend.MkGraph
   -- import Debug.Trace
 
   data ParseState' = ParseState'
-    { labels :: M.Map Int32 LN.Name {- store offset -> label -}
+    { basicBlocks :: M.Map Int32 LG.BasicBlock {- store offset -> label -}
+    , currentBlockIdx :: Int
     , nBlocks :: Int
-    , basicBlocks :: [LG.BasicBlock]
     , blockEntries :: S.Set Int32 {- store block entries (data gained from first pass) -}
     , localVariableNames :: [LN.Name]
 
@@ -121,19 +121,22 @@ module LLVMFrontend.MkGraph
       hstarts = S.fromList $ map (fromIntegral . eHandlerPC)
                            $ codeExceptions decoded
       initstate :: ParseState'
-      initstate = ParseState' { labels = M.empty
-                              , blockEntries = S.empty
-                              , nBlocks = 0
-                              , pcOffset = 0
-                              , operandStack = []
-                              , classf = cls
-                              , method = meth
-                              , basicBlocks = [LG.BasicBlock (LN.Name "entry") [] retvoid]
-                              , localVariableNames = []
-                              , autotmpN = 0
-                              , instructions = jvminsn
-                              , exceptionMap = exmap
-                              , handlerStarts = hstarts }
+      initstate = ParseState' {
+        -- We begin with only a single entry block
+        basicBlocks = M.fromList [(0, LG.BasicBlock (LN.Name "entry") [] retvoid)]
+        , currentBlockIdx = 0
+        , blockEntries = S.empty
+        , nBlocks = 0
+        , pcOffset = 0
+        , operandStack = []
+        , classf = cls
+        , method = meth
+        , localVariableNames = []
+        , autotmpN = 0
+        , instructions = jvminsn
+        , exceptionMap = exmap
+        , handlerStarts = hstarts
+      }
       runAll prog = execStateT prog initstate
 
   prettyHeader :: String -> IO ()
@@ -214,6 +217,7 @@ module LLVMFrontend.MkGraph
       -- the size of the instruction) to its requested jump target instruction.
       addPCs :: Int32 -> Word16 -> J.Instruction -> ParseState ()
       addPCs pc rel ins = do
+        liftIO $ printfJit $ show ins ++ "(" ++ show (pc + w16Toi32 rel) ++ ")\n"
         addPC (pc + insnLength ins) -- Some instructions use more than one bytecode
         addPC (pc + w16Toi32 rel) -- Jump target for program counter
 
@@ -284,15 +288,25 @@ module LLVMFrontend.MkGraph
   -- Add a label for the provided program counter, if not already.
   addLabel :: Int32 -> ParseState LN.Name
   addLabel boff = do
-    lmap <- labels <$> get
+    lmap <- basicBlocks <$> get
     if M.member boff lmap
-      then return $ lmap M.! boff -- Already present
+      then return . basicBlockName $ lmap M.! boff -- Already present
       else do
         -- Construct a new label. We also create an outgoing edge to the label,
         -- as otherwise it would violate the basic block invariant.
-        label <- generateBasicBlockName
-        modify (\s -> s { labels = M.insert boff label (labels s) })
-        return label
+        bb <- generateBasicBlock
+        modify (\s -> s { basicBlocks = M.insert boff bb (basicBlocks s) })
+        liftIO $ printfJit $ "Added basic block " ++ (show . basicBlockName) bb ++ " at offset " ++ show boff ++ "\n"
+        return . basicBlockName $ bb
+
+  basicBlock :: LN.Name -> LG.BasicBlock
+  basicBlock name = LG.BasicBlock name [] retvoid
+
+  basicBlockName :: LG.BasicBlock -> LN.Name
+  basicBlockName (LG.BasicBlock n _ _) = n
+
+  generateBasicBlock :: ParseState LG.BasicBlock
+  generateBasicBlock = basicBlock <$> generateBasicBlockName
 
   -- Increment program counter, also  handling multibyte instructions.
   incrementPC :: J.Instruction -> ParseState ()
@@ -337,17 +351,16 @@ module LLVMFrontend.MkGraph
         let ifstuff jcmp rel op1 op2 = do
               truejmp <- addLabel (pc + w16Toi32 rel)
               falsejmp <- addLabel (pc + insnLength ins)
-              error "Conditionals not supported..."
+              return undefined -- TODO
               -- return ([], IRIfElse jcmp op1 op2 truejmp falsejmp)
         -- Handle switch statements, adding outgoing edges to each case statement.
         let switchins def switch' = do
               y <- apop
               switch <- forM switch' $ \(v, o) -> do
                 offset <- addLabel $ pc + fromIntegral o
-                error "Conditionals not supported..."
-                -- return (Just (w32Toi32 v), offset)
+                return (Just (w32Toi32 v), offset)
               defcase <- addLabel $ pc + fromIntegral def
-              error "Conditionals not supported..."
+              return undefined -- TODO
               -- return ([], IRSwitch y $ switch ++ [(Nothing, defcase)])
         (ret1, ret2) <- case ins of
           RETURN -> return ([], retvoid)
@@ -359,7 +372,12 @@ module LLVMFrontend.MkGraph
           (IF jcmp rel) -> error "Conditionals not supported..."
           (IFNULL rel) -> error "Conditionals not supported..."
           (IFNONNULL rel) -> error "Conditionals not supported..."
-          (IF_ICMP jcmp rel) -> error "Conditionals not supported..."
+          (IF_ICMP jcmp rel) -> do
+            op1 <- popOperand
+            op2 <- popOperand
+            ifstuff jcmp rel op1 op2
+            return undefined
+
           (IF_ACMP jcmp rel) -> error "Conditionals not supported..."
           (GOTO rel) -> error "Conditionals not supported..."
           TABLESWITCH _ def low high offs -> switchins def $ zip [low..high] offs
@@ -798,32 +816,27 @@ module LLVMFrontend.MkGraph
     modify' $ \s -> s { operandStack = tail ops }
     return op
 
-  updateCurrentBlock :: LG.BasicBlock -> ParseState ()
-  updateCurrentBlock b = do
-    blocks <- gets basicBlocks
-    when (null blocks) $ error "No current basic block..."
-    modify' $ \s -> s { basicBlocks = b : tail blocks }
+  -- Updates the current basic block (referred to by currentBlockIdx) in-place.
+  updateCurrentBlock :: (LG.BasicBlock -> Maybe LG.BasicBlock) -> ParseState ()
+  updateCurrentBlock f = do
+    currIdx <- fromIntegral <$> gets currentBlockIdx
+    modify' $ \s -> s { basicBlocks = M.update f currIdx (basicBlocks s) }
 
   -- Sets the current terminator of this basic block. The terminator is an terminal
   -- operation (I.E one that is the very last instruction to be called) and generally
   -- results in branching of control flow or a return statement
   setTerminator :: LI.Named LI.Terminator -> ParseState ()
-  setTerminator term = do
-    block <- head <$> gets basicBlocks
-    updateCurrentBlock $ setTerminator' term block
+  setTerminator term = updateCurrentBlock $ setTerminator' term
 
     where
-      setTerminator' term (LG.BasicBlock n i t) = LG.BasicBlock n i term
+      setTerminator' term (LG.BasicBlock n i t) = Just $ LG.BasicBlock n i term
 
   -- Appends an instruction to the specified basic block by creating a copy containing
   -- the requested instruction.
   appendInstruction :: LI.Named LI.Instruction -> ParseState ()
-  appendInstruction instr = do
-    block <- head <$> gets basicBlocks
-    updateCurrentBlock $ appendInstruction' instr block
-
+  appendInstruction instr = updateCurrentBlock $ appendInstruction' instr
     where
-      appendInstruction' i (LG.BasicBlock n is t) = LG.BasicBlock n (is ++ [i]) t
+      appendInstruction' i (LG.BasicBlock n is t) = Just $ LG.BasicBlock n (is ++ [i]) t
 
   -- Generate a named local variable name for each possible local variable
   setupLocals :: ParseState ()
