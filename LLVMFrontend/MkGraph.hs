@@ -554,17 +554,15 @@ module LLVMFrontend.MkGraph
     error "Not Supported"
     -- y <- apop
     -- return [IRStore (RTPool x) LT.ptrNull y]
-  -- tir (LDC1 x) = tir (LDC2 (fromIntegral x))
-  -- tir (LDC2 x) = do
-  --   cls <- classf <$> get
-  --   let valuetype = case constsPool cls M.! x of
-  --             (CString _) -> LT.i64
-  --             (CInteger _) -> LT.i32
-  --             e -> error $ "tir: LDCI... missing impl.: " ++ show e
-  --   nv <- newvar
-  --   apush nv
-  --   error "Not Supported..."
-    -- return [IRLoad (RTPool x) LT.ptrNull nv]
+  tir (LDC1 x) = tir (LDC2 (fromIntegral x))
+  tir (LDC2 x) = do
+    cls <- classf <$> get
+    case constsPool cls M.! x of
+              (CString s) -> error "String not supported..."
+              (CInteger i) -> pushConstant $ int i
+              (CFloat f) -> pushConstant $ float f
+              e -> error $ "tir: LDCI... missing impl.: " ++ show e
+    return ()
   tir (NEW x) = do
     error "Not Supported"
     -- nv <- newvar LT.ptr

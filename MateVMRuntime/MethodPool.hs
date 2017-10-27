@@ -117,10 +117,12 @@ compileMethod' mod =
       Mod.withModuleFromAST c mod $ \m ->
         -- Make a simple optimization pass
         withPassManager defaultCuratedPassSetSpec { optLevel = Just 3, sizeLevel = Just 3 } $ \pm -> do
-          -- runPassManager pm m
           optmod <- Mod.moduleAST m -- Optimized-copy of module
           s <- Mod.moduleLLVMAssembly m -- Convert from module to assembly
-          printfJit $ C8.unpack s
+          printfJit $ "~~~Original...~~~\n" ++ C8.unpack s
+          runPassManager pm m
+          s' <- Mod.moduleLLVMAssembly m -- Convert from module to assembly
+          printfJit $ "~~~Optimized...~~~\n" ++ C8.unpack s'
 
           -- Actually execute module... execution engine is modified to contain the
           -- actual code...
