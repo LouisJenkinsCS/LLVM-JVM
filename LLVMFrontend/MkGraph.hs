@@ -48,6 +48,7 @@ module LLVMFrontend.MkGraph
   import qualified LLVM.AST.Name as LN
   import qualified LLVM.AST.Type as LT
   import qualified LLVM.AST.Float as LF
+  import qualified LLVM.AST.IntegerPredicate as LIP
   import LLVMFrontend.Helpers
 
   -- import Debug.Trace
@@ -230,7 +231,9 @@ module LLVMFrontend.MkGraph
 
   -- Creates a basic block entry for this program counter.
   addPC :: Int32 -> ParseState ()
-  addPC bcoff = modify (\s -> s { blockEntries = S.insert bcoff (blockEntries s) })
+  addPC bcoff = do
+    addLabel bcoff
+    modify (\s -> s { blockEntries = S.insert bcoff (blockEntries s) })
 
 
   mkMethod :: ParseState ()
@@ -322,6 +325,9 @@ module LLVMFrontend.MkGraph
     when (null i) $ error "popInstruction: something is really wrong here"
     modify (\s -> s { instructions = tail i })
 
+  setCurrentIdx :: Integral a => a -> ParseState ()
+  setCurrentIdx idx = modify $ \s -> s { currentBlockIdx = fromIntegral idx }
+
   toMid :: ParseState ()
   toMid = do
       pc <- pcOffset <$> get
@@ -329,10 +335,14 @@ module LLVMFrontend.MkGraph
       when (null insns) $ error "toMid: something is really wrong here :/"
       ins <- head <$> instructions <$> get
       entries <- blockEntries <$> get
+      blocks <- gets basicBlocks
       if S.member (pc + insnLength ins) entries
         then do
           -- Refers to an already-existing basic block...
+          -- Emulate the 'fallthrough' effect inherent in assembly instructions by
+          -- adding an edge to the next basic block
           res <- toLast ins
+          setCurrentIdx (pc + insnLength ins)
           incrementPC ins
           return res
         else do
@@ -349,8 +359,32 @@ module LLVMFrontend.MkGraph
         -- Handle if-else statement, where we have two outgoing edges from the
         -- conditionally-executed basic block, and to the end of the basic block.
         let ifstuff jcmp rel op1 op2 = do
+              -- Create isolated header block...
+              headerBlock <- addLabel pc
+              -- Add edge from predecessor
+              setTerminator $ br headerBlock
+              -- Become headerBlock
+              setCurrentIdx pc
+
+              -- Create the basic blocks...
               truejmp <- addLabel (pc + w16Toi32 rel)
               falsejmp <- addLabel (pc + insnLength ins)
+
+              -- Perform comparison of op1 and op2 based on JVM instructions
+              cmpName <- newvar
+              let cmp = LO.LocalReference LT.i32 cmpName
+              let cmpInstr = case jcmp of
+                                          J.C_LE -> LIP.SLE
+                                          J.C_EQ -> LIP.EQ
+                                          J.C_GE -> LIP.SGE
+                                          J.C_GT -> LIP.SGT
+                                          J.C_LT -> LIP.SLT
+                                          J.C_NE -> LIP.NE
+
+              appendInstruction $ cmpName LI.:= LI.ICmp cmpInstr op1 op2 []
+
+              -- branch conditionally based on result
+              setTerminator $ cbr cmp truejmp falsejmp
               return undefined -- TODO
               -- return ([], IRIfElse jcmp op1 op2 truejmp falsejmp)
         -- Handle switch statements, adding outgoing edges to each case statement.
@@ -362,8 +396,8 @@ module LLVMFrontend.MkGraph
               defcase <- addLabel $ pc + fromIntegral def
               return undefined -- TODO
               -- return ([], IRSwitch y $ switch ++ [(Nothing, defcase)])
-        (ret1, ret2) <- case ins of
-          RETURN -> return ([], retvoid)
+        case ins of
+          RETURN -> return undefined
           ARETURN -> returnSomething LT.i32
           IRETURN -> returnSomething LT.i32
           LRETURN -> returnSomething LT.i64
@@ -379,13 +413,13 @@ module LLVMFrontend.MkGraph
             return undefined
 
           (IF_ACMP jcmp rel) -> error "Conditionals not supported..."
-          (GOTO rel) -> error "Conditionals not supported..."
+          (GOTO rel) -> do lbl <- addLabel (pc + w16Toi32 rel); setTerminator $ br lbl; return undefined
           TABLESWITCH _ def low high offs -> switchins def $ zip [low..high] offs
           LOOKUPSWITCH _ def _ switch -> switchins def switch
           _ -> do -- fallthrough case
-            -- next <- addLabel (pc + insnLength ins)
-            insIR <- tir ins
-            error $ "Processing instruction: " ++ show insIR
+            tir ins
+            next <- addLabel (pc + insnLength ins)
+            setTerminator $ br next
         -- fixups <- handleBlockEnd
         return ()
         where
@@ -829,7 +863,8 @@ module LLVMFrontend.MkGraph
   setTerminator term = updateCurrentBlock $ setTerminator' term
 
     where
-      setTerminator' term (LG.BasicBlock n i t) = Just $ LG.BasicBlock n i term
+      setTerminator' term (LG.BasicBlock n i t) = Just $ LG.BasicBlock n i $
+        if t == retvoid then term else t
 
   -- Appends an instruction to the specified basic block by creating a copy containing
   -- the requested instruction.

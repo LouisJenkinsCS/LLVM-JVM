@@ -117,7 +117,7 @@ compileMethod' mod =
       -- Create an LLVM module from the AST generated...
       Mod.withModuleFromAST c mod $ \m ->
         -- Make a simple optimization pass
-        withPassManager defaultPassSetSpec { transforms = [PromoteMemoryToRegister] } $ \pm -> do
+        withPassManager defaultPassSetSpec { transforms = [PromoteMemoryToRegister, JumpThreading] } $ \pm -> do
           optmod <- Mod.moduleAST m -- Optimized-copy of module
           s <- Mod.moduleLLVMAssembly m -- Convert from module to assembly
           printfJit $ "~~~Original...~~~\n" ++ C8.unpack s

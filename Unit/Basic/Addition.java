@@ -8,6 +8,10 @@ class Addition {
     int result;
     if (w > x) {
       result = w;
+    } else if (y > w) {
+      result = y;
+    } else if (z > w) {
+      result = z;
     } else {
       result = x;
     }
