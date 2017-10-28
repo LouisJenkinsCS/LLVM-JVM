@@ -41,6 +41,8 @@ import LLVM.Transforms
 foreign import ccall "dynamic"
    code_void :: FunPtr (IO ()) -> IO ()
 
+foreign import ccall "dynamic"
+ code_int :: FunPtr (IO Int) -> IO Int
 
 lookupMethodEntry:: MethodInfo -> IO CPtrdiff
 lookupMethodEntry mi@(MethodInfo method cm sig) = do
@@ -103,7 +105,7 @@ compileMethod name sig cls = do
 
   cfg <- pipeline cls meth (codeInstructions . decodeMethod $ code)
   -- cfg <- parseCFG (decodeMethod code)
-  let mod = AST.defaultModule { AST.moduleDefinitions = [defineFn AST.VoidType "main" (M.elems $ basicBlocks cfg)], AST.moduleName = "Dummy" }
+  let mod = AST.defaultModule { AST.moduleDefinitions = [defineFn (returnType sig) "main" (M.elems $ basicBlocks cfg)], AST.moduleName = "Dummy" }
   ast <- compileMethod' mod
   error . show $ ast
 
@@ -132,7 +134,7 @@ compileMethod' mod =
             mainfn <- EE.getFunction ee' "main"
             case mainfn of
               Just fn -> do
-                result <- code_void (castFunPtr fn :: FunPtr (IO ()))
+                result <- code_int (castFunPtr fn :: FunPtr (IO Int))
                 printfJit $ "Evaluated to: " ++ show result
               Nothing -> return ()
 

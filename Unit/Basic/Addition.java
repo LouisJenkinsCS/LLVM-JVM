@@ -1,5 +1,6 @@
 class Addition {
-  public static void main(String[] args) {
+
+  public static int RunMe() {
     int x = 0x1000;
     int y = 0x2000;
     int z = 0x3000;
@@ -15,5 +16,11 @@ class Addition {
     } else {
       result = x;
     }
+
+    return result;
+  }
+
+  public static void main(String[] args) {
+
   }
 }

@@ -27,6 +27,9 @@ module Main where
 
   import Misc.Logger
 
+  bootstrapMethod :: String
+  bootstrapMethod = "RunMe"
+
   main ::  IO ()
   main = do
     time "main" $ do
@@ -71,11 +74,11 @@ module Main where
     --required on some platforms, initializes boehmgc. [todo bernhard: maybe this should be moved somewhere else - maybe at a global place where vm initialization takes place]
     unless usePreciseGC initGC
 
-    case find ((==) (C8.pack "main") . methodName) (classMethods cls) of
+    case find ((==) (C8.pack bootstrapMethod) . methodName) (classMethods cls) of
       Just m -> do
-        let mi = MethodInfo (C8.pack "main") bclspath $ methodSignature m
+        let mi = MethodInfo (C8.pack bootstrapMethod) bclspath $ methodSignature m
         entry <- lookupMethodEntry mi
-        printfInfo "executing `main' now:\n"
+        printfInfo $ "executing '" ++ bootstrapMethod ++ "' now:\n"
         executeFuncPtr (fromIntegral entry)
         printfInfo "Well, goodbye Sir!\n"
-      Nothing -> error "main not found"
+      Nothing -> error $ bootstrapMethod ++ " not found"

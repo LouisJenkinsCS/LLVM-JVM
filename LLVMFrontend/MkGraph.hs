@@ -10,6 +10,8 @@ module LLVMFrontend.MkGraph
   , mkBlocks
   , mkMethod
   , pipeline
+  , jvm2llvmType
+  , returnType
   ) where
 
   import qualified Data.List as L
@@ -121,6 +123,7 @@ module LLVMFrontend.MkGraph
       hstarts :: S.Set Int32
       hstarts = S.fromList $ map (fromIntegral . eHandlerPC)
                            $ codeExceptions decoded
+
       initstate :: ParseState'
       initstate = ParseState' {
         -- We begin with only a single entry block
@@ -139,6 +142,24 @@ module LLVMFrontend.MkGraph
         , handlerStarts = hstarts
       }
       runAll prog = execStateT prog initstate
+
+  jvm2llvmType :: FieldType -> LT.Type
+  jvm2llvmType typ = case typ of
+    SignedByte -> LT.i8
+    CharByte -> LT.i8
+    DoubleType -> LT.double
+    FloatType -> LT.float
+    IntType -> LT.i32
+    LongInt -> LT.i64
+    ShortInt -> LT.i16
+    BoolType -> LT.i1
+    (ObjectType _) -> LT.i64
+    (Array dim typ) -> LT.ArrayType (maybe 0 fromIntegral dim) (jvm2llvmType typ)
+
+
+  returnType :: MethodSignature -> LT.Type
+  returnType (MethodSignature _ (Returns typ)) = jvm2llvmType typ
+  returnType (MethodSignature _ ReturnsVoid) = LT.void
 
   prettyHeader :: String -> IO ()
   prettyHeader str = do
@@ -381,7 +402,7 @@ module LLVMFrontend.MkGraph
                                           J.C_LT -> LIP.SLT
                                           J.C_NE -> LIP.NE
 
-              appendInstruction $ cmpName LI.:= LI.ICmp cmpInstr op1 op2 []
+              appendInstruction $ cmpName LI.:= LI.ICmp cmpInstr op2 op1 []
 
               -- branch conditionally based on result
               setTerminator $ cbr cmp truejmp falsejmp
@@ -426,7 +447,8 @@ module LLVMFrontend.MkGraph
           -- Return the top operand (after performing type-checking)
           returnSomething t = do
             r <- apop
-            error $ "Processing Type: " ++ show t ++ ", " ++ show r
+            setTerminator $ ret r
+            -- error $ "Processing Type: " ++ show t ++ ", " ++ show r
             -- unless (varType r == t) $ error "toLast return: type mismatch"
             -- return ([], IRReturn $ Just r)
 
