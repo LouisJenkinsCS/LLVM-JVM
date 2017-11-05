@@ -19,4 +19,11 @@ A Java Virtual Machine with the goals of providing a frontend to convert JVM byt
 
 ## Progress
 
-- [ ] LLVM Frontend
+Note: the criteria for progress is bars minimum, such as basic integer arithmetic and if-else statements. If it is checked it does not mean support for all of it, just that the ground work is done and can easily be extended on. 
+
+- [X] Basic Arithmetic
+- [X] Basic Control Flow
+- [X] LLVM optimization passes
+- [ ] Global Variables (Fields)
+- [ ] Dynamic ClassLoading (JIT at runtime)
+- [ ] Garbage Collection (Boehms)
