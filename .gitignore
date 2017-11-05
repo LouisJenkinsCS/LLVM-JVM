@@ -4,7 +4,6 @@ Documentation/
 *.dyn_hi*
 *.dyn_o*
 *.log
-*.cabal
 *.json
 *.exe
 Main
