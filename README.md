@@ -24,6 +24,6 @@ Note: the criteria for progress is bars minimum, such as basic integer arithmeti
 - [X] Basic Arithmetic
 - [X] Basic Control Flow
 - [X] LLVM optimization passes
-- [ ] Global Variables (Fields)
+- [X] Global Variables (Fields)
 - [ ] Dynamic ClassLoading (JIT at runtime)
 - [ ] Garbage Collection (Boehms)
