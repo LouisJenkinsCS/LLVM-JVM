@@ -4,6 +4,8 @@ Documentation/
 *.dyn_hi*
 *.dyn_o*
 *.log
+*.h
+*.hi-boot
 *.json
 *.exe
 Main

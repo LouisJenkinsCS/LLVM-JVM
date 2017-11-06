@@ -23,6 +23,7 @@ module LLVMFrontend.MkGraph
   import Data.Int
   import Data.Word
   import Data.Maybe
+  import Unsafe.Coerce
 
   import Control.Applicative hiding ((<*>))
   import Control.Monad
@@ -263,6 +264,7 @@ module LLVMFrontend.MkGraph
     -- Create labels for each exception handler, as well as for the entry block.
     forM_ (S.toList hs ++ [0]) addLabel
     return ()
+
 
   mkBlocks :: ParseState ()
   mkBlocks = do
@@ -619,14 +621,33 @@ module LLVMFrontend.MkGraph
     -- apush nv
     -- return [IRLoad (RTPool x) obj nv]
   tir (GETSTATIC x) = do
-    error "Not Supported"
-    -- cls <- classf <$> get
-    -- nv <- newvar (fieldType cls x)
-    -- apush nv
-    -- return [IRLoad (RTPool x) LT.ptrNull nv]
+    cls <- gets classf
+    (fname, ftype) <- case constsPool cls M.! x of
+      (CField _ (NameType fname ftype)) -> return (fname, ftype)
+      _ -> error $ "Bad index: " ++ show x
+
+    let fieldRef = cons $ global (LT.ptr . jvm2llvmType $ ftype) (mkName' fname)
+    tmp <- newvar
+    pushOperand $ LO.LocalReference (jvm2llvmType ftype) tmp
+    appendInstruction $ tmp LI.:= load fieldRef
+      where
+        mkName' :: B.ByteString -> LN.Name
+        mkName' = LN.mkName . map unsafeCoerce . B.unpack
   tir (PUTSTATIC x) = do
-    error "Not Supported"
-    -- y <- apop
+    y <- popOperand
+
+    cls <- gets classf
+    (fname, ftype) <- case constsPool cls M.! x of
+      (CField _ (NameType fname ftype)) -> return (fname, ftype)
+      _ -> error $ "Bad index: " ++ show x
+
+    let fieldRef = cons $ global (LT.ptr . jvm2llvmType $ ftype) (mkName' fname)
+    appendInstruction $ LI.Do $ store fieldRef y
+      where
+        mkName' :: B.ByteString -> LN.Name
+        mkName' = LN.mkName . map unsafeCoerce . B.unpack
+
+    -- appendInstruction $ LI.Do $ load (global LT.i32 ) 
     -- return [IRStore (RTPool x) LT.ptrNull y]
   tir (LDC1 x) = tir (LDC2 (fromIntegral x))
   tir (LDC2 x) = do

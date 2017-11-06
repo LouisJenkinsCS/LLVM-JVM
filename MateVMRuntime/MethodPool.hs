@@ -14,6 +14,7 @@ import Data.Maybe (fromJust)
 
 import Foreign
 import Foreign.C.Types
+import Unsafe.Coerce
 
 import JVM.ClassFile
 import JVM.Assembler
@@ -27,7 +28,10 @@ import MateVMRuntime.ClassPool
 import MateVMRuntime.NativeMethods
 
 import qualified LLVM.AST as AST
+import qualified LLVM.AST.Global as LG
+import qualified LLVM.AST.Linkage as LL
 import qualified LLVM.ExecutionEngine as EE
+import qualified LLVM.AST.Constant as LC
 import LLVM.Context
 import LLVM.CodeModel
 import LLVM.Target
@@ -96,6 +100,20 @@ insertCompiledMethod entry (MethodInfo mmname _ msig) clsnames = do
 initModule :: AST.Module
 initModule = AST.defaultModule { AST.moduleName = "dummy" }
 
+mkName' :: B.ByteString -> AST.Name
+mkName' = AST.mkName . map unsafeCoerce . B.unpack
+
+parseFields :: Class Direct -> [AST.Definition]
+parseFields cls = 
+  flip map (classFields cls) $ \field -> 
+    let nameType = fieldNameType field in
+      AST.GlobalDefinition $ LG.globalVariableDefaults { 
+        LG.name = mkName' $ ntName nameType,
+        LG.type' = jvm2llvmType $ ntSignature nameType,
+        LG.linkage = LL.Private,
+        LG.initializer = Just $ LC.Int 32 0
+      }
+
 -- Stubbed for now...
 -- TODO: Do LLVM
 compileMethod :: B.ByteString -> MethodSignature -> Class Direct -> IO (a,b)
@@ -105,7 +123,7 @@ compileMethod name sig cls = do
 
   cfg <- pipeline cls meth (codeInstructions . decodeMethod $ code)
   -- cfg <- parseCFG (decodeMethod code)
-  let mod = AST.defaultModule { AST.moduleDefinitions = [defineFn (returnType sig) "main" (M.elems $ basicBlocks cfg)], AST.moduleName = "Dummy" }
+  let mod = AST.defaultModule { AST.moduleDefinitions = parseFields cls ++ [defineFn (returnType sig) "main" (M.elems $ basicBlocks cfg)], AST.moduleName = "Dummy" }
   ast <- compileMethod' mod
   error . show $ ast
 
@@ -135,7 +153,8 @@ compileMethod' mod =
             case mainfn of
               Just fn -> do
                 result <- code_int (castFunPtr fn :: FunPtr (IO Int))
-                printfJit $ "Evaluated to: " ++ show result
+                printfJit . show $ result
+                
               Nothing -> return ()
 
           -- Optimized module used only in next pass...

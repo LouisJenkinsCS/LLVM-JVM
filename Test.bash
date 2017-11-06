@@ -29,7 +29,8 @@ for d in */; do
       continue
     fi
 
-    bootstrap=$(locate -r '/rt.jar$')
+    bootstrap=$(java -verbose 2>/dev/null | sed -ne '1 s/\[Opened \(.*\)\]/\1/p')
+    echo "bootstrap: $bootstrap, file: $f"
     javac -target 1.7 -source 1.7 -bootclasspath $bootstrap $f
     ../../Main.exe -cp ../../rt:./ "$filename" 1> tmp.out 2> tmp.err
 
