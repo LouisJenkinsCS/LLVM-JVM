@@ -40,6 +40,7 @@ import LLVM.PassManager
 import LLVMFrontend.Helpers
 import LLVMFrontend.MkGraph
 import LLVM.Transforms
+import System.IO
 
 
 foreign import ccall "dynamic"
@@ -140,10 +141,10 @@ compileMethod' mod =
         withPassManager defaultPassSetSpec { transforms = [PromoteMemoryToRegister, JumpThreading] } $ \pm -> do
           optmod <- Mod.moduleAST m -- Optimized-copy of module
           s <- Mod.moduleLLVMAssembly m -- Convert from module to assembly
-          printfJit $ "~~~Original...~~~\n" ++ C8.unpack s
+          writeFile "unoptimizedIR.ll" (C8.unpack s)
           runPassManager pm m
           s' <- Mod.moduleLLVMAssembly m -- Convert from module to assembly
-          printfJit $ "~~~Optimized...~~~\n" ++ C8.unpack s'
+          writeFile "optimizedIR.ll" (C8.unpack s')
 
           -- Actually execute module... execution engine is modified to contain the
           -- actual code...

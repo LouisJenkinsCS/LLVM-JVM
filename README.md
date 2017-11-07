@@ -2,6 +2,8 @@
 
 README under construction...
 
+**Warning:** The code is a complete and utter mess! You've been warned!
+
 ## Note
 
 LLVM-JVM uses a ripped and modified version of [MateVM](https://github.com/MateVM/MateVM)'s runtime, while

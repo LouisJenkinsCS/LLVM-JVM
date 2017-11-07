@@ -128,7 +128,7 @@ module LLVMFrontend.MkGraph
       initstate :: ParseState'
       initstate = ParseState' {
         -- We begin with only a single entry block
-        basicBlocks = M.fromList [(0, LG.BasicBlock (LN.Name "entry") [] retvoid)]
+        basicBlocks = M.fromList [(0, LG.BasicBlock (LN.Name "entry") [] (ret . LO.ConstantOperand $ int 0))]
         , currentBlockIdx = 0
         , blockEntries = S.empty
         , nBlocks = 0
@@ -326,7 +326,7 @@ module LLVMFrontend.MkGraph
         return . basicBlockName $ bb
 
   basicBlock :: LN.Name -> LG.BasicBlock
-  basicBlock name = LG.BasicBlock name [] retvoid
+  basicBlock name = LG.BasicBlock name [] (ret . LO.ConstantOperand $ int 0)
 
   basicBlockName :: LG.BasicBlock -> LN.Name
   basicBlockName (LG.BasicBlock n _ _) = n
@@ -906,8 +906,8 @@ module LLVMFrontend.MkGraph
   setTerminator term = updateCurrentBlock $ setTerminator' term
 
     where
-      setTerminator' term (LG.BasicBlock n i t) = Just $ LG.BasicBlock n i $
-        if t == retvoid then term else t
+      setTerminator' term (LG.BasicBlock n i t) = Just $ LG.BasicBlock n i term
+        -- if t == retvoid then term else t
 
   -- Appends an instruction to the specified basic block by creating a copy containing
   -- the requested instruction.
