@@ -702,28 +702,23 @@ module LLVMFrontend.MkGraph
     -- apush v3; apush v2; apush v1
     -- return [IROp Add nv v1 (LT.i32Value 0)]
   tir POP = do popOperand; return ()
-  tir IADD = do
-    x <- popOperand
-    y <- popOperand
-    tmp <- newvar
-    pushOperand $ LO.LocalReference LT.i32 tmp
-    appendInstruction $ tmp LI.:= LLVMFrontend.Helpers.add x y
+  tir IADD = binaryOp LLVMFrontend.Helpers.add
   -- tir ISUB = tirOpInt LI.Sub LT.i32
   -- tir INEG = do
   --   x <- apop
   --   apush (LO.ConstantOperand $ int 0)
   --   apush x
   --   tirOpInt LI.Sub LT.i32
-  -- tir IMUL = tirOpInt LI.Mul LT.i32
-  -- tir IDIV = tirOpInt LI.SDiv LT.i32
-  -- tir IREM = tirOpInt LI.SRem LT.i32
-  -- tir IAND = tirOpInt LI.And LT.i32
-  -- tir IOR = tirOpInt LI.Or LT.i32
-  -- tir IXOR = tirOpInt LI.Xor LT.i32
-  -- tir IUSHR = tirOpInt LI.LShr LT.i32
+  tir IMUL = binaryOp LLVMFrontend.Helpers.mult
+  tir IDIV = binaryOp $ \x y -> LI.SDiv False x y []
+  tir IREM = binaryOp $ \x y -> LI.SRem x y []
+  tir IAND = binaryOp $ \x y -> LI.And x y []
+  tir IOR = binaryOp $ \x y -> LI.Or x y []
+  tir IXOR = binaryOp $ \x y -> LI.Xor x y []
+  -- tir IUSHR = binaryOp $ \x y -> LI.USHR x y []
   -- tir ISHR = tirOpInt LI.AShr LT.i32
   -- tir ISHL = tirOpInt LI.Shl LT.i32
-  -- tir FADD = tirOpInt LI.Add LT.float
+  tir FADD = binaryOp LLVMFrontend.Helpers.fadd
   tir I2C = do
     error "Not Supported"
     -- x <- apop
@@ -951,6 +946,13 @@ module LLVMFrontend.MkGraph
     float -> cons $ LC.Float . LF.Single $ 0
     ptr -> cons $ int 0
 
+  binaryOp :: (LO.Operand -> LO.Operand -> LI.Instruction) -> ParseState ()
+  binaryOp f = do
+    x <- popOperand
+    y <- popOperand
+    tmp <- newvar
+    pushOperand $ LO.LocalReference LT.i32 tmp
+    appendInstruction $ tmp LI.:= f x y
 
   tirStore :: Word8 -> LT.Type -> ParseState ()
   tirStore w8 t = do

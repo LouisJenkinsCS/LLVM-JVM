@@ -58,6 +58,10 @@ module LLVMFrontend.Helpers where
   add :: Operand -> Operand -> Instruction
   add a b = LI.Add False False a b []
 
+  mult :: Operand -> Operand -> Instruction
+  mult a b = LI.Mul False False a b []
+
+
   -- Arithmetic and Constants for floating points
   fadd :: Operand -> Operand -> Instruction
   fadd a b = FAdd NoFastMathFlags a b []

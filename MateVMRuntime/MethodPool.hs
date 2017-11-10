@@ -138,7 +138,7 @@ compileMethod' mod =
       -- Create an LLVM module from the AST generated...
       Mod.withModuleFromAST c mod $ \m ->
         -- Make a simple optimization pass
-        withPassManager defaultPassSetSpec { transforms = [PromoteMemoryToRegister, JumpThreading] } $ \pm -> do
+        withPassManager defaultCuratedPassSetSpec { optLevel = Just 3 } $ \pm -> do
           optmod <- Mod.moduleAST m -- Optimized-copy of module
           s <- Mod.moduleLLVMAssembly m -- Convert from module to assembly
           writeFile "unoptimizedIR.ll" (C8.unpack s)
@@ -155,6 +155,7 @@ compileMethod' mod =
               Just fn -> do
                 result <- code_int (castFunPtr fn :: FunPtr (IO Int))
                 printfJit . show $ result
+                writeFile "out.txt" $ show result
                 
               Nothing -> return ()
 
