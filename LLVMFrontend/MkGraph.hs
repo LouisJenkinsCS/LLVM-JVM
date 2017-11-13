@@ -86,7 +86,6 @@ module LLVMFrontend.MkGraph
     mapM_ (printfPipe . printf "\t%s\n" . show) jvminsn
     prettyHeader "Code Generation"
     action <- liftIO $ runAll $ do
-      setupLocals
       addExceptionBlocks
       resolveReferences
       resetPC jvminsn
@@ -530,6 +529,17 @@ module LLVMFrontend.MkGraph
   imm2num I2 = 2
   imm2num I3 = 3
 
+  jvmByte2LLVMType :: Word8 -> LT.Type
+  jvmByte2LLVMType 4  = LT.i1
+  jvmByte2LLVMType 5  = LT.i8
+  jvmByte2LLVMType 6  = LT.float
+  jvmByte2LLVMType 7  = LT.double
+  jvmByte2LLVMType 8  = LT.i8
+  jvmByte2LLVMType 9  = LT.i16
+  jvmByte2LLVMType 10 = LT.i32
+  jvmByte2LLVMType 11 = LT.i64
+  jvmByte2LLVMType x  = error $ "Unknown array type byte: " ++ show x
+
   fieldType :: Class Direct -> Word16 -> LT.Type
   fieldType cls off = fieldType2VarType $ ntSignature nt
     where nt = case constsPool cls M.! off of
@@ -603,7 +613,7 @@ module LLVMFrontend.MkGraph
   tir (FSTORE_ y) = tir (FSTORE (imm2num y))
   tir (FSTORE y) = tirStore y LT.float
   tir (ASTORE_ x) = tir (ASTORE (imm2num x))
-  tir (ASTORE x) = tirStore x LT.i64
+  tir (ASTORE x) = tirStore x (LT.ptr LT.i32)
   tir (PUTFIELD x) = do
     error "Not Supported"
     -- src <- apop
@@ -664,7 +674,10 @@ module LLVMFrontend.MkGraph
     -- apush nv
     -- return [IRLoad (RTPoolCall x []) LT.ptrNull nv]
   -- tir (ANEWARRAY _) = tirArray ReferenceType 10 -- for int. TODO?
-  -- tir (NEWARRAY w8) = tirArray PrimitiveType w8
+  tir (NEWARRAY w8) = unaryOp makeArray
+    where
+      makeArray op@(LO.ConstantOperand (LC.Int _ n)) = 
+        LI.Alloca ((LT.ptr (jvmByte2LLVMType w8))) (Just op) 8 [] 
   tir ARRAYLENGTH = do
     error "Not Supported"
     -- array <- apop
@@ -676,7 +689,7 @@ module LLVMFrontend.MkGraph
   -- tir IALOAD = tirArrayLoad LT.i32 Nothing
   -- tir CALOAD = tirArrayLoad LT.i32 (Just 0xff)
   -- tir AASTORE = tirArrayStore LT.ptr Nothing
-  -- tir IASTORE = tirArrayStore LT.i32 Nothing
+  tir IASTORE = return ()
   -- tir CASTORE = tirArrayStore LT.i32 (Just 0xff)
   tir DUP = popOperand >>= replicateM_ 2 . pushOperand
   tir DUP_X1 = do
@@ -895,31 +908,27 @@ module LLVMFrontend.MkGraph
     where
       appendInstruction' i (LG.BasicBlock n is t) = Just $ LG.BasicBlock n (is ++ [i]) t
 
-  -- Generate a named local variable name for each possible local variable
-  setupLocals :: ParseState ()
-  setupLocals = do
-    -- For each maximum locals, generate a name for it in advance
-    meth <- gets method
-    let code = M.fromList (arlist (methodAttributes meth)) M.! "Code"
-    let maxLocals = J.codeMaxLocals $ decodeMethod code
-    names <- forM [0..maxLocals-1] $ \i -> do
-      let name = LN.mkName ("L" ++ show i)
-      appendInstruction $ name LI.:= alloca LT.i32
-      return name
-    modify $ \s -> s { localVariableNames = names }
-
-  -- Obtains the local variable at requested index
-  getLocal :: Integral a => a -> ParseState LN.Name
-  getLocal idx = do
+  -- Obtains the local variable at requested index. If the local variable
+  -- has not yet been allocated (first-use) we allocate it with the requested
+  -- type.
+  getLocal :: Integral a => a -> LT.Type -> ParseState LN.Name
+  getLocal idx typ = do
     let idx' = fromIntegral idx
     vars <- gets localVariableNames
-    return $ if idx' < length vars then vars !! idx'
-      else error $ "Local variable indexed at " ++ show idx' ++ " when maximum is " ++ (show . length $ vars) ++ "\n"
 
+    -- Allocate on-demand
+    when (idx' >= length vars) $ do
+      let name = LN.mkName ("L" ++ show idx')
+      appendInstruction $ name LI.:= alloca typ
+      modify $ \s -> s { localVariableNames = vars ++ [name] }
+
+    vars' <- gets localVariableNames
+    return $ vars' !! idx'
+      
   tirLoad' :: Word8 -> LT.Type -> ParseState ()
   tirLoad' x t = do
     tmpName <- LN.UnName <$> nextTemp
-    name <- getLocal x
+    name <- getLocal x t
     appendInstruction $ tmpName LI.:= load (local t name)
     pushOperand $ LO.LocalReference LT.i32 tmpName
     liftIO $ printfPipe $ "Load " ++ show tmpName ++ "\n"
@@ -947,7 +956,7 @@ module LLVMFrontend.MkGraph
 
   tirStore :: Word8 -> LT.Type -> ParseState ()
   tirStore w8 t = do
-    localName <- getLocal w8
+    localName <- getLocal w8 t
     storeInstr <- store (local t localName) <$> popOperand
     appendInstruction (LI.Do storeInstr)
     liftIO $ printfPipe $ "Store " ++ show localName ++ "\n"

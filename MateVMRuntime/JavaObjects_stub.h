@@ -2,7 +2,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-extern HsInt32 cloneObject(HsInt32 a1);
+extern HsInt64 cloneObject(HsInt64 a1);
 #ifdef __cplusplus
 }
 #endif

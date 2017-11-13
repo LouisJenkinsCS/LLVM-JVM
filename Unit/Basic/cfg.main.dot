@@ -1,0 +1,22 @@
+digraph "CFG for 'main' function" {
+	label="CFG for 'main' function";
+
+	Node0xa9a1c0 [shape=record,label="{BB8:\l  %0 = add i32 8192, 4096\l  %1 = add i32 12288, %0\l  %2 = icmp sle i32 %1, 4096\l  br i1 %2, label %BB9, label %BB0\l|{<s0>T|<s1>F}}"];
+	Node0xa9a1c0:s0 -> Node0xa9a260;
+	Node0xa9a1c0:s1 -> Node0xa9a210;
+	Node0xa9a210 [shape=record,label="{BB0:                                              \l  store i32 %1, i32* @result\l  br label %BB2\l}"];
+	Node0xa9a210 -> Node0xa9a3f0;
+	Node0xa9a260 [shape=record,label="{BB9:                                              \l  %3 = icmp sle i32 8192, %1\l  br i1 %3, label %BB10, label %BB3\l|{<s0>T|<s1>F}}"];
+	Node0xa9a260:s0 -> Node0xa9a300;
+	Node0xa9a260:s1 -> Node0xa9a2b0;
+	Node0xa9a2b0 [shape=record,label="{BB3:                                              \l  store i32 8192, i32* @result\l  br label %BB2\l}"];
+	Node0xa9a2b0 -> Node0xa9a3f0;
+	Node0xa9a300 [shape=record,label="{BB10:                                             \l  %4 = icmp sle i32 12288, %1\l  br i1 %4, label %BB6, label %BB5\l|{<s0>T|<s1>F}}"];
+	Node0xa9a300:s0 -> Node0xa9a3a0;
+	Node0xa9a300:s1 -> Node0xa9a350;
+	Node0xa9a350 [shape=record,label="{BB5:                                              \l  store i32 12288, i32* @result\l  br label %BB2\l}"];
+	Node0xa9a350 -> Node0xa9a3f0;
+	Node0xa9a3a0 [shape=record,label="{BB6:                                              \l  store i32 4096, i32* @result\l  br label %BB2\l}"];
+	Node0xa9a3a0 -> Node0xa9a3f0;
+	Node0xa9a3f0 [shape=record,label="{BB2:                                              \l  %5 = load i32, i32* @result\l  ret i32 %5\l}"];
+}
