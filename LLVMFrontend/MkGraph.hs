@@ -678,54 +678,38 @@ module LLVMFrontend.MkGraph
   -- tir AASTORE = tirArrayStore LT.ptr Nothing
   -- tir IASTORE = tirArrayStore LT.i32 Nothing
   -- tir CASTORE = tirArrayStore LT.i32 (Just 0xff)
-  tir DUP = do
-    error "Not Supported"
-    -- x <- apop
-    -- apush x
-    -- nv <- newvar (varType x)
-    -- apush nv
-    -- return [IROp Add nv x (LT.i32Value 0)]
+  tir DUP = popOperand >>= replicateM_ 2 . pushOperand
   tir DUP_X1 = do
-    error "Not Supported"
-    -- v1 <- apop; v2 <- apop
-    -- nv <- newvar (varType v1)
-    -- apush nv
-    -- apush v2; apush v1
-    -- return [IROp Add nv v1 (LT.i32Value 0)]
+    x <- popOperand
+    y <- popOperand
+    pushOperand x
+    pushOperand y
+    pushOperand x
   tir DUP_X2 = do
     -- WARNING: different behaviour for LONG & DOUBLE!!
     -- see, category 2 computational type (§2.11.1).
-    error "Not Supported"
-    -- v1 <- apop; v2 <- apop; v3 <- apop
-    -- nv <- newvar (varType v1)
-    -- apush nv
-    -- apush v3; apush v2; apush v1
-    -- return [IROp Add nv v1 (LT.i32Value 0)]
+    x <- popOperand
+    y <- popOperand
+    z <- popOperand
+    pushOperand x
+    pushOperand z
+    pushOperand y
+    pushOperand x
   tir POP = do popOperand; return ()
   tir IADD = binaryOp LLVMFrontend.Helpers.add
-  -- tir ISUB = tirOpInt LI.Sub LT.i32
-  -- tir INEG = do
-  --   x <- apop
-  --   apush (LO.ConstantOperand $ int 0)
-  --   apush x
-  --   tirOpInt LI.Sub LT.i32
+  tir ISUB = binaryOp $ \x y -> LI.Sub False False x y []
+  tir INEG = do pushConstant $ int (-1); tir IMUL
   tir IMUL = binaryOp LLVMFrontend.Helpers.mult
   tir IDIV = binaryOp $ \x y -> LI.SDiv False x y []
   tir IREM = binaryOp $ \x y -> LI.SRem x y []
   tir IAND = binaryOp $ \x y -> LI.And x y []
   tir IOR = binaryOp $ \x y -> LI.Or x y []
   tir IXOR = binaryOp $ \x y -> LI.Xor x y []
-  -- tir IUSHR = binaryOp $ \x y -> LI.USHR x y []
-  -- tir ISHR = tirOpInt LI.AShr LT.i32
-  -- tir ISHL = tirOpInt LI.Shl LT.i32
+  tir IUSHR = binaryOp $ \x y -> LI.LShr False x y []
+  tir ISHR = binaryOp $ \x y -> LI.AShr False x y []
+  tir ISHL = binaryOp $ \x y -> LI.Shl False False x y []
   tir FADD = binaryOp LLVMFrontend.Helpers.fadd
-  tir I2C = do
-    error "Not Supported"
-    -- x <- apop
-    -- when (varType x /= LT.i32) $ error "tir: i2c: type mismatch"
-    -- nv <- newvar LT.i32
-    -- apush nv
-    -- return [IROp And nv x (LT.i32Value 0xff)]
+  tir I2C = do pushConstant $ int 0xFF; tir IAND
   -- tir (INVOKESTATIC ident) = tirInvoke CallStatic ident
   -- tir (INVOKESPECIAL ident) = tirInvoke CallSpecial ident
   -- tir (INVOKEVIRTUAL ident) = tirInvoke CallVirtual ident
@@ -945,6 +929,13 @@ module LLVMFrontend.MkGraph
     i32 -> cons $ int 0
     float -> cons $ LC.Float . LF.Single $ 0
     ptr -> cons $ int 0
+
+  unaryOp :: (LO.Operand -> LI.Instruction) -> ParseState ()
+  unaryOp f = do
+    x <- popOperand
+    tmp <- newvar
+    pushOperand $ LO.LocalReference LT.i32 tmp
+    appendInstruction $ tmp LI.:= f x
 
   binaryOp :: (LO.Operand -> LO.Operand -> LI.Instruction) -> ParseState ()
   binaryOp f = do
