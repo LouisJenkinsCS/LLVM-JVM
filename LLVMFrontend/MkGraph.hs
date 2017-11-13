@@ -425,16 +425,24 @@ module LLVMFrontend.MkGraph
           LRETURN -> returnSomething LT.i64
           FRETURN -> returnSomething LT.float
           DRETURN -> returnSomething LT.double
-          (IF jcmp rel) -> error "Conditionals not supported..."
-          (IFNULL rel) -> error "Conditionals not supported..."
-          (IFNONNULL rel) -> error "Conditionals not supported..."
+          (IF jcmp rel) -> do
+            let op1 = LO.ConstantOperand $ int 0
+            op2 <- popOperand
+            ifstuff jcmp rel op1 op2
+          (IFNULL rel) -> do
+            op1 <- apop
+            ifstuff C_EQ rel op1 (nul LT.i64)
+          (IFNONNULL rel) -> do
+            op1 <- apop
+            ifstuff C_NE rel op1 (nul LT.i64)
           (IF_ICMP jcmp rel) -> do
             op1 <- popOperand
             op2 <- popOperand
             ifstuff jcmp rel op1 op2
-            return undefined
-
-          (IF_ACMP jcmp rel) -> error "Conditionals not supported..."
+          (IF_ACMP jcmp rel) -> do
+            op1 <- popOperand
+            op2 <- popOperand
+            ifstuff jcmp rel op1 op2
           (GOTO rel) -> do lbl <- addLabel (pc + w16Toi32 rel); setTerminator $ br lbl; return undefined
           TABLESWITCH _ def low high offs -> switchins def $ zip [low..high] offs
           LOOKUPSWITCH _ def _ switch -> switchins def switch
@@ -596,7 +604,7 @@ module LLVMFrontend.MkGraph
   tir FCONST_2 =  pushConstant $ LC.Float . LF.Single $ 3
   tir (ILOAD_ x) = tir (ILOAD (imm2num x))
   tir (ILOAD x) = tirLoad' x LT.i32 -- tirLoad' x LT.i32; return []
-  -- tir (IINC x con) = do
+  tir (IINC x con) = do tir (ILOAD x); tir (BIPUSH con); tir (IADD); tir (ISTORE x)
   --   tirLoad' x LT.i32
   --   y <- apop
   --   nv <- newvar LT.i32
@@ -710,17 +718,17 @@ module LLVMFrontend.MkGraph
     pushOperand x
   tir POP = do popOperand; return ()
   tir IADD = binaryOp LLVMFrontend.Helpers.add
-  tir ISUB = binaryOp $ \x y -> LI.Sub False False x y []
+  tir ISUB = binaryOp $ \x y -> LI.Sub False False y x []
   tir INEG = do pushConstant $ int (-1); tir IMUL
   tir IMUL = binaryOp LLVMFrontend.Helpers.mult
-  tir IDIV = binaryOp $ \x y -> LI.SDiv False x y []
-  tir IREM = binaryOp $ \x y -> LI.SRem x y []
-  tir IAND = binaryOp $ \x y -> LI.And x y []
-  tir IOR = binaryOp $ \x y -> LI.Or x y []
-  tir IXOR = binaryOp $ \x y -> LI.Xor x y []
-  tir IUSHR = binaryOp $ \x y -> LI.LShr False x y []
-  tir ISHR = binaryOp $ \x y -> LI.AShr False x y []
-  tir ISHL = binaryOp $ \x y -> LI.Shl False False x y []
+  tir IDIV = binaryOp $ \x y -> LI.SDiv False y x []
+  tir IREM = binaryOp $ \x y -> LI.SRem y x []
+  tir IAND = binaryOp $ \x y -> LI.And y x []
+  tir IOR = binaryOp $ \x y -> LI.Or y x []
+  tir IXOR = binaryOp $ \x y -> LI.Xor y x []
+  tir IUSHR = binaryOp $ \x y -> LI.LShr False y x []
+  tir ISHR = binaryOp $ \x y -> LI.AShr False y x []
+  tir ISHL = binaryOp $ \x y -> LI.Shl False False y x []
   tir FADD = binaryOp LLVMFrontend.Helpers.fadd
   tir I2C = do pushConstant $ int 0xFF; tir IAND
   -- tir (INVOKESTATIC ident) = tirInvoke CallStatic ident
@@ -936,6 +944,7 @@ module LLVMFrontend.MkGraph
   nul :: LT.Type -> LO.Operand
   nul t = case t of
     i32 -> cons $ int 0
+    i64 -> cons $ int 0
     float -> cons $ LC.Float . LF.Single $ 0
     ptr -> cons $ int 0
 
