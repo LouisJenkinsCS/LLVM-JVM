@@ -6,7 +6,6 @@ Documentation/
 *.log
 *.h
 *.hi-boot
-*.json
 *.exe
 Main
 dist/*
