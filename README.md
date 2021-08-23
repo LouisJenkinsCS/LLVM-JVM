@@ -1,5 +1,7 @@
 # LLVM-JVM
 
+**Code for Functional Bytecode Interpreter (Proof-of-Concept) has been moved here: https://github.com/LouisJenkinsCS/Functional-JVM-Bytecode-Interpreter
+
 LLVM-JVM is an attempt at creating a Java Virtual Machine with Just-In-Time compilation
 that uses LLVM as the backend, similar to [Azul System's](https://www.azul.com/called-new-jit-compiler-falcon/).
 This project, however, is an educational one and likely will never be production-ready.
